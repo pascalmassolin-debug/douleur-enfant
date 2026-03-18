@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gestion de la douleur — Simulation clinique</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #F0F8FF; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    /* ── Stockage local (localStorage) ── */
+    const storage = {
+      async list(prefix) {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+        return { keys };
+      },
+      async get(key) {
+        const v = localStorage.getItem(key);
+        return v ? { value: v } : null;
+      },
+      async set(key, value) {
+        localStorage.setItem(key, value);
+        return { key, value };
+      }
+    };
+    window.storage = storage;
+
+    const P = {
+      pri:"#1A6FA8", priL:"#2E9BD6", priXL:"#EAF5FF",
+      teal:"#0E8A7A", tealL:"#E6F5F3",
+      green:"#15803D", greenL:"#DCFCE7",
+      amber:"#B45309", amberL:"#FEF3C7",
+      red:"#B91C1C", redL:"#FEE2E2",
+      gray:"#64748B",
+      bg:"linear-gradient(160deg,#F0F8FF 0%,#E8F4FD 50%,#E0EEF9 100%)",
+    };
+    const grad = `linear-gradient(135deg,${P.priL},${P.pri})`;
+
+    const CASES = [
+      {
+        id:1, emoji:"👶", tag:"Nourrisson · 4 mois", soin:"Prise de sang",
+        base:"Vous entrez dans la salle. Un nourrisson de 4 mois est posé sur la table d'examen pour une prise de sang. Il pleure. Sa maman est assise à côté.",
+        clues:[
+          {id:"c1a",cat:"👁️",lab:"Observer la mimique",find:"Expression peu marquée entre les pleurs. Pas de grimace franche ni de sillon naso-labial creusé visible."},
+          {id:"c1b",cat:"👁️",lab:"Observer le tonus",find:"Corps globalement tonique mais non crispé. Membres en flexion physiologique habituelle."},
+          {id:"c1c",cat:"💬",lab:"Interroger la maman",find:"« Il pleure comme ça à chaque fois qu'on le déshabille ou qu'on le pose sur une surface froide. C'est habituel. »"},
+          {id:"c1d",cat:"📋",lab:"Vérifier le stade du soin",find:"La prise de sang n'a PAS encore débuté. Vous venez juste de vous approcher pour préparer le matériel."},
+          {id:"c1e",cat:"👁️",lab:"Observer la réaction au réconfort",find:"Quand la maman lui parle doucement et lui tient la main, les pleurs diminuent nettement en moins d'une minute."},
+          {id:"c1f",cat:"🌡️",lab:"Mesurer les signes physiologiques",find:"Respiration régulière. Pas de tachypnée ni de désaturation visible. FC normale pour l'âge."},
+        ],
+        minClues:3,
+        analysis:{
+          q:"Sur la base de vos observations, comment analysez-vous la situation ?",
+          opts:[
+            {l:"Douleur probable",s:"Les signes orientent vers une nociception active",ok:false},
+            {l:"Données insuffisantes / à explorer",s:"Impossible de conclure avec ces seuls éléments",ok:true},
+            {l:"Plutôt réaction émotionnelle",s:"Réaction à l'environnement sans stimulus nociceptif actif",ok:false},
+          ],
+          cons:[
+            "Vous décidez d'une prise en charge analgésique immédiate. Mais la prise de sang n'a pas encore commencé — aucun nocicepteur n'est activé. Votre évaluation EVENDOL donne 2/10 uniquement sur des pleurs de confort. Quelques éléments importants semblent vous avoir échappé.",
+            null,
+            "Vous ignorez les pleurs et commencez le soin sans préparation. Lors de la ponction, la réaction du nourrisson s'intensifie brusquement. Vous n'aviez peut-être pas encore toutes les données nécessaires. Reprenez l'observation.",
+          ],
+          expl:"Les pleurs précèdent tout geste, s'apaisent au réconfort maternel, la respiration est normale et le soin n'a pas encore commencé. Aucun nocicepteur n'est activé. On ne peut pas conclure avant le geste : les données sont insuffisantes.",
+        },
+        scales:{
+          q:"Quelle(s) échelle(s) allez-vous utiliser pour évaluer ce nourrisson PENDANT le soin ?",
+          opts:[
+            {l:"DAN (Douleur Aiguë Nouveau-né)",s:"0–3 mois · douleur procédurale · hétéroévaluation",ok:true,cons:null},
+            {l:"EVENDOL",s:"Naissance–7 ans · 5 items comportementaux",ok:true,cons:null},
+            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · nécessite compréhension · dès ~4 ans",ok:false,cons:"Vous montrez la FPS-R au nourrisson. Il regarde les visages sans réagir. À 4 mois, l'auto-évaluation est neurologiquement impossible — il n'existe aucune capacité d'abstraction à cet âge. Le score est inexploitable."},
+            {l:"FLACC",s:"1 mois–7 ans · hétéroévaluation comportementale",ok:true,cons:null},
+          ],
+          multi:true,
+          expl:"À 4 mois, seule l'hétéroévaluation est possible. DAN (0–3 mois, douleur procédurale), EVENDOL et FLACC sont toutes adaptées. La FPS-R requiert des capacités cognitives inaccessibles avant ~4 ans.",
+        },
+        methods:[
+          {l:"Solution sucrée (sucrose) 2 min avant le geste",ok:true,c_ok:"Le sucrose active les voies opioïdes endogènes. Lors de la ponction, le score EVENDOL est significativement réduit. L'effet est mesurable.",c_ko:null},
+          {l:"Succion non nutritive (tétine) pendant le geste",ok:true,c_ok:"La tétine est acceptée. La succion combinée au sucrose renforce l'analgésie. Les grimaces sont moins intenses.",c_ko:null},
+          {l:"Peau à peau avec la maman pendant le soin",ok:true,c_ok:"En peau à peau, la FC et la SpO₂ se stabilisent. La réponse physiologique au soin est atténuée.",c_ko:null},
+          {l:"Emmaillotage / position contenante",ok:true,c_ok:"L'emmaillotage réduit l'agitation motrice. Le score de douleur pendant la ponction est plus bas.",c_ko:null},
+          {l:"Voix douce et comptine de la maman",ok:true,c_ok:"La voix familière module la réponse douloureuse. L'attention de l'enfant est partiellement captée vers une source connue et rassurante.",c_ko:null},
+          {l:"Respiration guidée 'souffler les bougies'",ok:false,c_ok:null,c_ko:"Le nourrisson ne réagit pas à la consigne verbale. À 4 mois, le contrôle volontaire de la respiration est neurologiquement impossible. La technique est sans effet."},
+          {l:"Demander à la maman de sortir de la pièce",ok:false,c_ok:null,c_ko:"Les pleurs s'intensifient immédiatement. La séparation parentale active les circuits de détresse et amplifie la perception douloureuse."},
+        ],
+        win:"La ponction s'est déroulée avec un score de douleur minimal. La maman, impliquée activement dans le soin, repart rassurée et avec confiance en l'équipe.",
+      },
+      {
+        id:2, emoji:"😣", tag:"Enfant · 3 ans", soin:"Retrait de pansement",
+        base:"Un enfant de 3 ans est dans la salle de soin pour un retrait de pansement au genou. Il pleure, crie 'Arrête !' et pousse la main du soignant.",
+        clues:[
+          {id:"c2a",cat:"📋",lab:"Observer le moment exact du geste",find:"Les cris et le retrait de main surviennent précisément au moment où vous tirez sur le pansement. Avant le toucher, il était juste anxieux."},
+          {id:"c2b",cat:"👁️",lab:"Observer la mimique pendant le geste",find:"Grimace franche pendant le retrait : sourcils froncés, yeux plissés, bouche ouverte. Sillon naso-labial creusé."},
+          {id:"c2c",cat:"💬",lab:"Interroger le parent",find:"« Il a déjà eu des pansements retirés. Il pleure toujours, mais là c'est plus intense. Il dit que ça tire vraiment. »"},
+          {id:"c2d",cat:"📋",lab:"Examiner la plaie et le pansement",find:"Plaie de 5 jours, bien collée au pansement. Tissu de cicatrisation présent. Retrait adhésif prévisible et reconnu comme douloureux."},
+          {id:"c2e",cat:"👁️",lab:"Observer le tonus corporel pendant le retrait",find:"Corps crispé, jambes tendues vers l'avant, poings serrés. Hypertonie marquée au moment du geste."},
+          {id:"c2f",cat:"💬",lab:"Interroger l'enfant",find:"À la question 'Où tu as mal ?', l'enfant pointe clairement son genou. La localisation est confirmée même s'il ne peut pas décrire plus."},
+        ],
+        minClues:3,
+        analysis:{
+          q:"Comment analysez-vous ce que vit cet enfant de 3 ans ?",
+          opts:[
+            {l:"Douleur probable",s:"Les signes orientent vers une nociception active",ok:true},
+            {l:"Données insuffisantes / à explorer",s:"Impossible de conclure avec ces seuls éléments",ok:false},
+            {l:"Plutôt réaction émotionnelle",s:"Réaction de peur sans stimulus nociceptif clair",ok:false},
+          ],
+          cons:[
+            null,
+            "Vous attendez plus d'informations. Pendant ce temps, le retrait est réalisé sans préparation. L'enfant crie intensément, le parent est bouleversé. Les données disponibles étaient pourtant suffisantes : le lien entre le geste et la réaction était clair.",
+            "Vous concluez à de la peur et retirez le pansement rapidement 'pour que ce soit fini vite'. L'enfant crie encore plus fort. La grimace franche et l'hypertonie pendant le geste indiquaient clairement une nociception active, pas seulement de l'anxiété.",
+          ],
+          expl:"Le retrait de main et la grimace surviennent exactement au moment du geste. La localisation confirmée, l'hypertonie et l'intensité des pleurs orientent vers une douleur probable. La composante anxieuse existe aussi — les deux sont réels et nécessitent d'être pris en charge.",
+        },
+        scales:{
+          q:"Quelle(s) échelle(s) pour évaluer cet enfant de 3 ans pendant le soin ?",
+          opts:[
+            {l:"FLACC",s:"6 mois–7 ans · 5 dimensions comportementales · hétéroévaluation",ok:true,cons:null},
+            {l:"EVENDOL",s:"Naissance–7 ans · 5 items comportementaux",ok:true,cons:null},
+            {l:"FPS-R",s:"Auto-évaluation · compréhension requise · dès ~4 ans",ok:false,cons:"Vous tentez la FPS-R avec l'enfant de 3 ans. Il pointe un visage différent à chaque présentation, sans comprendre la consigne. L'auto-évaluation n'est pas fiable avant ~4 ans — le score obtenu ne reflète pas la réalité."},
+            {l:"EVA",s:"Échelle visuelle abstraite · inaccessible avant 8 ans",ok:false,cons:"Vous présentez l'EVA à l'enfant de 3 ans. Il déplace le curseur au hasard, attentif à l'objet plutôt qu'au sens de la gradation. Le score obtenu est inexploitable — la notion d'échelle abstraite n'est pas accessible avant 8 ans."},
+          ],
+          multi:true,
+          expl:"À 3 ans : hétéroévaluation de référence. FLACC et EVENDOL sont toutes deux recommandées. La FPS-R peut être tentée dès 4 ans avec compréhension suffisante. L'EVA est inaccessible avant 8 ans.",
+        },
+        methods:[
+          {l:"Présence parentale active (tenir la main, parler doucement)",ok:true,c_ok:"L'enfant est toujours inconfortable mais ses cris sont moins intenses et plus courts. La régulation émotionnelle parentale module sa réponse douloureuse.",c_ko:null},
+          {l:"Distraction active (dessin animé sur tablette)",ok:true,c_ok:"L'enfant regarde l'écran quelques secondes pendant le retrait. La distraction cognitive réduit le traitement cortical de la douleur.",c_ko:null},
+          {l:"Positionnement sur les genoux du parent",ok:true,c_ok:"L'enfant est moins agité en position sécurisante. Le contact physique réduit l'anxiété et facilite la réalisation du soin.",c_ko:null},
+          {l:"Jeu thérapeutique (montrer le geste sur une poupée avant)",ok:true,c_ok:"L'enfant observe la poupée avec curiosité. Quand vient son tour, l'imprévisibilité est réduite. Il coopère légèrement mieux.",c_ko:null},
+          {l:"Comptine ou musique préférée de l'enfant",ok:true,c_ok:"Les pleurs s'entrecoupent de moments d'attention à la musique familière. La distraction auditive atténue la perception de la douleur.",c_ko:null},
+          {l:"Succion non nutritive (tétine)",ok:false,c_ok:null,c_ko:"L'enfant repousse la tétine avec irritation. À 3 ans, la succion non nutritive n'a plus l'effet analgésique observé chez le nourrisson. Le rejet augmente sa frustration."},
+          {l:"Respiration guidée 'souffler les bougies'",ok:false,c_ok:null,c_ko:"L'enfant essaie brièvement puis reprend ses pleurs. Le contrôle volontaire de la respiration sous stress n'est accessible que vers 4 ans. La technique n'est pas encore fiable."},
+        ],
+        win:"Le retrait s'est déroulé avec une détresse réduite. L'enfant a coopéré quelques instants. Le parent repart avec des stratégies à réutiliser à domicile.",
+      },
+      {
+        id:3, emoji:"😰", tag:"Enfant · 4 ans", soin:"Prise de sang (soin non débuté)",
+        base:"Un enfant de 4 ans s'agrippe à son parent dans le couloir. Il pleure et répète 'Non, non !' Il n'a pas encore été touché.",
+        clues:[
+          {id:"c3a",cat:"📋",lab:"Vérifier si le soin a commencé",find:"La salle est vide. Aucun geste n'a été réalisé. Le matériel n'est pas encore sorti. L'enfant est dans le couloir."},
+          {id:"c3b",cat:"📋",lab:"Explorer l'histoire du soin",find:"L'enfant reconnaît les lieux — il y est déjà venu. Le parent rapporte qu'il commence à pleurer dès l'entrée du bâtiment."},
+          {id:"c3c",cat:"👁️",lab:"Observer le corps et le comportement",find:"Agrippé au parent et le regardant. Pas de crispation corporelle pathologique. Pas de grimace de douleur. Il parle activement ('Non !')."},
+          {id:"c3d",cat:"👁️",lab:"Évaluer le tonus musculaire",find:"Pas d'hypertonie. Corps relativement détendu, juste agrippé au parent. Pleurs sans rigidité musculaire."},
+          {id:"c3e",cat:"💬",lab:"Interroger le parent en détail",find:"« Il a peur depuis la dernière prise de sang. Ce matin, il a dit 'Je veux pas aller à l'hôpital'. Il s'en souvient clairement. »"},
+          {id:"c3f",cat:"🌡️",lab:"Observer les signes physiologiques",find:"Respiration légèrement accélérée par les pleurs mais pas de tachypnée pathologique. Pas d'autres signes neurovégétatifs."},
+        ],
+        minClues:3,
+        analysis:{
+          q:"Comment analysez-vous ce que vit cet enfant avant le soin ?",
+          opts:[
+            {l:"Douleur probable",s:"Les signes orientent vers une nociception active",ok:false},
+            {l:"Données insuffisantes / à explorer",s:"Il manque des éléments pour conclure",ok:false},
+            {l:"Plutôt réaction émotionnelle",s:"Anticipation anxieuse — aucun stimulus nociceptif actif",ok:true},
+          ],
+          cons:[
+            "Vous estimez une douleur probable et administrez une intervention analgésique. Mais aucun geste n'a eu lieu, aucun nocicepteur n'est activé. Votre EVENDOL donne 2/10 sur des pleurs d'anticipation. L'intervention ne correspond pas au problème réel.",
+            "Vous cherchez encore des données pendant 10 minutes. L'anxiété de l'enfant monte. Ce que vous aviez observé était déjà suffisant pour agir. Qu'avez-vous retenu de vos observations sur le corps et le contexte de cet enfant ?",
+            null,
+          ],
+          expl:"Aucun geste n'a commencé. Corps détendu, pas d'hypertonie, mémoire explicite du soin précédent, pleurs anticipatoires : tout indique une anxiété anticipatoire. C'est une réaction émotionnelle normale qui mérite une prise en charge spécifique — car non gérée, elle amplifie la vraie douleur ensuite.",
+        },
+        scales:{
+          q:"Quelle(s) échelle(s) pour évaluer cet enfant de 4 ans avant et pendant le soin ?",
+          opts:[
+            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · validée dès ~4 ans si compréhension suffisante",ok:true,cons:null},
+            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément ou si auto-évaluation impossible",ok:true,cons:null},
+            {l:"EVA (Échelle Visuelle Analogique)",s:"Trop abstraite avant 8 ans · non recommandée ici",ok:false,cons:"Vous présentez l'EVA à l'enfant de 4 ans. Il regarde la réglette, la manipule, mais ne parvient pas à exprimer son vécu sur une échelle spatiale abstraite. L'EVA requiert une maturité cognitive accessible seulement vers 8 ans."},
+            {l:"DAN (Douleur Aiguë Nouveau-né)",s:"Réservée aux 0–3 mois · inadaptée",ok:false,cons:"Vous utilisez la DAN sur cet enfant de 4 ans. Les items conçus pour observer les réflexes néonataux ne correspondent pas du tout au comportement d'un enfant de 4 ans. Le score obtenu est cliniquement non interprétable."},
+          ],
+          multi:true,
+          expl:"À 4 ans : FPS-R recommandée en priorité si compréhension suffisante. Compléter par FLACC/EVENDOL si anxiété intense. La combinaison auto + hétéro est recommandée pour les 4–6 ans.",
+        },
+        methods:[
+          {l:"Jeu thérapeutique (montrer le geste sur une poupée)",ok:true,c_ok:"L'enfant touche la poupée et pose des questions. Quand vient son tour, il répète moins 'Non !' — l'imprévisibilité est réduite. Il sait ce qui l'attend.",c_ko:null},
+          {l:"Distraction active (tablette, dessin animé)",ok:true,c_ok:"L'enfant regarde l'écran pendant le geste. La distraction cognitive mobilise ses ressources attentionnelles.",c_ko:null},
+          {l:"Présence parentale guidée et rassurante",ok:true,c_ok:"Guidé par vous, le parent reste calme et parle doucement. L'enfant se régule progressivement sur le comportement de son parent.",c_ko:null},
+          {l:"Respiration guidée 'souffler les bougies'",ok:true,c_ok:"À 4 ans, l'enfant peut suivre la consigne. Sa respiration ralentit. Son tonus musculaire diminue légèrement. La préparation est efficace.",c_ko:null},
+          {l:"Histoire imaginaire pendant le soin",ok:true,c_ok:"L'enfant écoute. Pendant le geste, son attention est partiellement captée par l'histoire. Sa réponse douloureuse est modulée.",c_ko:null},
+          {l:"Demander au parent de sortir de la pièce",ok:false,c_ok:null,c_ko:"L'enfant hurle et se débat, inconsolable. Séparer un enfant anxieux de son parent avant un soin amplifie massivement sa détresse et compromet le déroulement du soin."},
+          {l:"Emmaillotage / contenance physique forcée",ok:false,c_ok:null,c_ko:"L'enfant se débat encore plus fort. À 4 ans, la contenance physique forcée est vécue comme intrusive. Elle amplifie l'anxiété et peut traumatiser l'enfant."},
+        ],
+        win:"L'enfant a traversé le soin avec une anxiété modérée. En partant, il dit : 'C'était pas aussi terrible.' Le parent vous remercie.",
+      },
+      {
+        id:4, emoji:"🤫", tag:"Enfant · 5 ans", soin:"Perfusion en cours",
+        base:"Vous entrez dans une chambre. Un enfant de 5 ans porteur d'une perfusion est allongé, immobile. Il ne parle pas. Il regarde le mur.",
+        clues:[
+          {id:"c4a",cat:"💬",lab:"Interroger le parent présent",find:"« Il est bizarre depuis tout à l'heure. D'habitude il n'arrête pas de parler. Là, il ne répond plus rien. »"},
+          {id:"c4b",cat:"👁️",lab:"Observer attentivement la mimique",find:"Sourcils légèrement froncés, légère crispation autour des yeux. Difficile à évaluer car il tourne la tête."},
+          {id:"c4c",cat:"👁️",lab:"Observer le tonus et la posture",find:"Corps rigide. Jambes étendues et immobiles. Il ne change pas de position malgré le temps qui passe."},
+          {id:"c4d",cat:"📋",lab:"Examiner le site de perfusion",find:"Perfusion au creux du bras. L'enfant tient ce bras de l'autre main, légèrement éloigné de son corps — posture de protection possible."},
+          {id:"c4e",cat:"👁️",lab:"Tenter d'entrer en contact",find:"Quand vous prononcez son prénom, il tourne brièvement les yeux vers vous, puis regarde à nouveau le mur. Réponse minimale mais présente."},
+          {id:"c4f",cat:"📋",lab:"Vérifier l'historique depuis la pose",find:"Perfusion posée il y a 2 heures. Aucune évaluation de la douleur n'a été réalisée depuis la pose."},
+        ],
+        minClues:3,
+        analysis:{
+          q:"Comment analysez-vous le comportement de cet enfant de 5 ans ?",
+          opts:[
+            {l:"Douleur probable",s:"Les signes orientent vers une nociception active",ok:false},
+            {l:"Données insuffisantes / à explorer",s:"Impossible de conclure sans évaluation directe",ok:true},
+            {l:"Plutôt réaction émotionnelle",s:"Retrait, fatigue ou tristesse sans douleur",ok:false},
+          ],
+          cons:[
+            "Vous administrez une analgésie directement. Votre FLACC donne 3/10 — mais s'agit-il vraiment de douleur ou d'anxiété ? Sans interagir directement avec l'enfant, vous traitez peut-être le mauvais problème. Certains éléments importants vous manquent encore.",
+            null,
+            "Vous concluez à la fatigue et repartez sans intervenir. Vingt minutes plus tard, le parent appelle : l'enfant pleure et dit que son bras fait très mal. Le silence et le retrait relationnel n'indiquent pas forcément l'absence de douleur.",
+          ],
+          expl:"Retrait relationnel, posture de protection du bras, sourcils froncés, comportement atypique signalé par le parent : autant de signaux d'alerte. Mais sans évaluation directe, on ne peut pas conclure sur la nature réelle du problème. Les données sont insuffisantes.",
+        },
+        scales:{
+          q:"Quelle(s) échelle(s) pour évaluer cet enfant de 5 ans ?",
+          opts:[
+            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · recommandée en priorité à 5 ans",ok:true,cons:null},
+            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément si l'enfant ne coopère pas",ok:true,cons:null},
+            {l:"DAN",s:"0–3 mois uniquement · inadaptée",ok:false,cons:"Vous tentez la DAN sur cet enfant de 5 ans. Les critères néonataux sont totalement inadaptés à son stade de développement. Le résultat est cliniquement sans valeur."},
+            {l:"EVA",s:"Trop abstraite avant 8 ans",ok:false,cons:"Vous présentez l'EVA. L'enfant saisit la réglette et la regarde sans comprendre comment y exprimer son ressenti. Cette représentation spatiale abstraite de la douleur n'est accessible qu'à partir de 8 ans environ."},
+          ],
+          multi:true,
+          expl:"À 5 ans : FPS-R en priorité. Compléter par FLACC/EVENDOL si l'enfant est mutique. La combinaison auto + hétéro est recommandée pour les 4–6 ans.",
+        },
+        methods:[
+          {l:"S'asseoir, parler doucement, établir le contact visuel",ok:true,c_ok:"L'enfant tourne la tête vers vous. Un contact visuel s'établit. Il répond par un léger haussement d'épaules. La connexion est amorcée — sans elle, aucune évaluation n'est fiable.",c_ko:null},
+          {l:"Proposer la FPS-R : 'Montre-moi comment tu te sens'",ok:true,c_ok:"Après un silence, l'enfant pointe le visage correspondant à 4/10. La douleur est confirmée. Vous pouvez maintenant agir de façon ciblée.",c_ko:null},
+          {l:"Distraction (dessin animé, musique au casque)",ok:true,c_ok:"Son regard se pose sur l'écran. Son corps se détend légèrement. La distraction cognitive occupe les ressources corticales et atténue la perception douloureuse.",c_ko:null},
+          {l:"Impliquer le parent activement",ok:true,c_ok:"Le parent parle doucement à son enfant. L'enfant répond progressivement à la voix rassurante. La co-régulation parent-enfant est un outil thérapeutique puissant.",c_ko:null},
+          {l:"Respiration guidée douce",ok:true,c_ok:"L'enfant suit le rythme respiratoire proposé. Son corps se détend imperceptiblement. Le tonus sympathique diminue.",c_ko:null},
+          {l:"Repartir sans intervenir ('il ne dit rien')",ok:false,c_ok:null,c_ko:"20 minutes plus tard, le parent appelle en urgence : l'enfant pleure. L'absence d'expression verbale n'est pas synonyme d'absence de douleur. La douleur intériorisée est un piège clinique classique à 5 ans."},
+          {l:"Augmenter l'éclairage et allumer la TV pour 'stimuler'",ok:false,c_ok:null,c_ko:"L'enfant se recroqueville et se couvre les yeux. L'hyperstimulation sensorielle augmente le stress et la perception douloureuse. L'environnement doit être apaisé, pas stimulé."},
+        ],
+        win:"Après évaluation (FPS-R 4/10), la prise en charge est mise en place. À la réévaluation : 2/10. L'enfant accepte un câlin de son parent.",
+      },
+      {
+        id:5, emoji:"😖", tag:"Enfant · 2 ans", soin:"Injection intramusculaire",
+        base:"Un enfant de 2 ans est allongé pour une injection intramusculaire. Il ne pleure pas encore, mais vous observez des modifications physiques.",
+        clues:[
+          {id:"c5a",cat:"👁️",lab:"Observer les membres inférieurs",find:"Jambes tendues, rigides, immobiles. Position anormale pour son âge — hypertonie des membres inférieurs."},
+          {id:"c5b",cat:"🌡️",lab:"Observer la respiration",find:"Respiration rapide et superficielle (~40 mouvements/min). Nettement au-dessus de la normale pour un enfant de 2 ans."},
+          {id:"c5c",cat:"👁️",lab:"Observer les mains et le tronc",find:"Poings serrés des deux côtés. Tension des avant-bras. Corps globalement crispé et hypertonique."},
+          {id:"c5d",cat:"💬",lab:"Interroger le parent",find:"« Il est toujours comme ça quand il a peur. Mais là c'est plus intense qu'avant le vaccin la dernière fois. »"},
+          {id:"c5e",cat:"📋",lab:"Vérifier l'état du soin",find:"L'injection n'a pas encore été réalisée. L'enfant voit le soignant préparer la seringue à côté de lui depuis 2 minutes."},
+          {id:"c5f",cat:"🌡️",lab:"Observer l'ensemble du tableau",find:"Tachypnée + hypertonie généralisée avant tout geste. Tableau de réponse neurovégétative marquée."},
+        ],
+        minClues:3,
+        analysis:{
+          q:"Comment interprétez-vous les signes que vous observez chez cet enfant de 2 ans ?",
+          opts:[
+            {l:"Douleur probable",s:"Les signes physiologiques orientent vers une nociception imminente",ok:true},
+            {l:"Données insuffisantes / à explorer",s:"Impossible de conclure sans plus d'éléments",ok:false},
+            {l:"Plutôt réaction émotionnelle",s:"Réaction de peur sans stimulus nociceptif actif",ok:false},
+          ],
+          cons:[
+            null,
+            "Vous cherchez encore des données. L'injection est réalisée sans préparation. Score FLACC : 8/10. Tachypnée + hypertonie généralisée avant tout geste = activation neurovégétative classique avant douleur aiguë. L'action préventive était déjà justifiée.",
+            "Vous réalisez l'injection sans préparation. Score FLACC : 8/10. L'enfant hurle. La tachypnée et l'hypertonie que vous observiez étaient des signaux neurovégétatifs d'activation du système nociceptif — pas seulement de la peur.",
+          ],
+          expl:"Tachypnée + hypertonie généralisée avant le geste = activation du système nerveux sympathique. Ces signes neurovégétatifs sont des indicateurs fiables de douleur aiguë imminente. Les pleurs ne sont pas obligatoires pour conclure à une nociception probable.",
+        },
+        scales:{
+          q:"Quelle(s) échelle(s) pour évaluer cet enfant de 2 ans ?",
+          opts:[
+            {l:"FLACC",s:"6 mois–7 ans · 5 items comportementaux · hétéroévaluation",ok:true,cons:null},
+            {l:"EVENDOL",s:"Naissance–7 ans · 5 items comportementaux",ok:true,cons:null},
+            {l:"FPS-R",s:"Auto-évaluation · compréhension insuffisante à 2 ans",ok:false,cons:"Vous présentez la FPS-R à l'enfant de 2 ans. Il pointe successivement plusieurs visages sans lien avec son état réel. À 2 ans, la compréhension de la consigne d'auto-évaluation est impossible — cette capacité cognitive se développe seulement vers 4 ans."},
+            {l:"EVA",s:"Impossible avant 8 ans",ok:false,cons:"Vous montrez l'EVA à l'enfant de 2 ans. Il regarde la réglette sans la moindre compréhension. Aucun lien ne peut être fait entre son ressenti et une échelle spatiale abstraite."},
+          ],
+          multi:true,
+          expl:"À 2 ans : hétéroévaluation obligatoire. FLACC et EVENDOL sont les deux échelles recommandées. Score FLACC ≥ 3/10 justifie une prise en charge.",
+        },
+        methods:[
+          {l:"Position contenante (emmaillotage, cocon)",ok:true,c_ok:"L'hypertonie diminue progressivement. Les poings se desserrent légèrement. La contenance reproduit les sensations utérines et réduit la réponse de stress.",c_ko:null},
+          {l:"Présence parentale active (tenir, parler, chanter)",ok:true,c_ok:"La respiration de l'enfant ralentit légèrement. La voix et le contact familiers activent les systèmes de régulation du stress.",c_ko:null},
+          {l:"Distraction active (bulles de savon, jouet)",ok:true,c_ok:"Les bulles captent l'attention quelques secondes pendant l'injection. La distraction visuelle détourne partiellement le cerveau du stimulus douloureux.",c_ko:null},
+          {l:"Comptine / voix rassurante",ok:true,c_ok:"L'enfant reconnaît le rythme de la comptine. Sa respiration s'adapte légèrement. Les circuits apaisants sont activés.",c_ko:null},
+          {l:"Succion non nutritive (tétine)",ok:true,c_ok:"La tétine est acceptée. La succion active le système de modulation de la douleur. La tachypnée diminue légèrement.",c_ko:null},
+          {l:"Imagerie guidée 'va dans ton endroit préféré'",ok:false,c_ok:null,c_ko:"L'enfant vous regarde sans comprendre. À 2 ans, l'imaginaire dirigé n'est pas encore accessible. La technique est sans effet observable."},
+          {l:"Jeu thérapeutique (poupée de soin)",ok:false,c_ok:null,c_ko:"L'enfant regarde sans intérêt. À 2 ans, la symbolisation par le jeu de rôle préparatoire n'est pas suffisamment développée."},
+        ],
+        win:"Score FLACC pendant l'injection : 3/10 au lieu de 8/10 sans préparation. L'enfant pleure mais est rapidement consolé dans les bras de son parent.",
+      },
+    ];
+
+    const CASE_MAX = c => 2 + 2 + c.methods.filter(m=>m.ok).length;
+    const TOTAL_MAX = CASES.reduce((s,c)=>s+CASE_MAX(c),0);
+
+    function childState(methods, sel) {
+      const okCount = methods.filter(m=>m.ok).length;
+      if (!okCount) return 0;
+      const okSel = methods.filter((m,i)=>m.ok&&sel.includes(i)).length;
+      const badSel = methods.filter((m,i)=>!m.ok&&sel.includes(i)).length;
+      return Math.max(0, Math.min(100, Math.round((okSel/okCount)*100 - badSel*25)));
+    }
+    function stateLabel(pct) {
+      if (pct>=100) return {icon:"😊",label:"Enfant apaisé — objectif atteint !",col:P.green,bg:P.greenL};
+      if (pct>=65)  return {icon:"🙂",label:"Bonne évolution",col:P.teal,bg:P.tealL};
+      if (pct>=35)  return {icon:"😟",label:"Amélioration partielle",col:P.amber,bg:P.amberL};
+      return          {icon:"😰",label:"Situation préoccupante",col:P.red,bg:P.redL};
+    }
+
+    function App() {
+      const [screen, setScreen] = useState("home");
+      const [nameInput, setNameInput] = useState("");
+      const [player, setPlayer] = useState("");
+      const [ci, setCi] = useState(0);
+      const [phase, setPhase] = useState("investigate");
+      const [flipped, setFlipped] = useState(new Set());
+      const [flipping, setFlipping] = useState(new Set());
+      const [anaSel, setAnaSel] = useState(null);
+      const [anaAttempts, setAnaAttempts] = useState(0);
+      const [anaCons, setAnaCons] = useState(null);
+      const [anaScore, setAnaScore] = useState(0);
+      const [scaSel, setScaSel] = useState([]);
+      const [scaAttempts, setScaAttempts] = useState(0);
+      const [scaCons, setScaCons] = useState(null);
+      const [scaScore, setScaScore] = useState(0);
+      const [methSel, setMethSel] = useState([]);
+      const [methApplied, setMethApplied] = useState(false);
+      const [methAttempts, setMethAttempts] = useState(0);
+      const [methScore, setMethScore] = useState(0);
+      const [caseScores, setCaseScores] = useState([]);
+      const [totalScore, setTotalScore] = useState(0);
+      const [lb, setLb] = useState([]);
+      const [ak, setAk] = useState(0);
+
+      useEffect(()=>{loadLb();},[]);
+
+      async function loadLb() {
+        try {
+          const r = await window.storage.list("dnmsescape_");
+          if (r?.keys?.length) {
+            const items = await Promise.all(r.keys.map(async k=>{
+              try{const x=await window.storage.get(k);return x?JSON.parse(x.value):null;}catch{return null;}
+            }));
+            setLb(items.filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,12));
+          }
+        } catch {}
+      }
+      async function saveLb(name,score) {
+        try {
+          const k=`dnmsescape_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+          await window.storage.set(k,JSON.stringify({name,score,max:TOTAL_MAX,ts:Date.now()}));
+          loadLb();
+        } catch {}
+      }
+
+      const c = CASES[ci];
+
+      function startGame() {
+        const n=nameInput.trim(); if(!n) return;
+        setPlayer(n); resetCase(0); setTotalScore(0); setCaseScores([]); setAk(k=>k+1); setScreen("game");
+      }
+
+      function resetCase(idx) {
+        setCi(idx); setPhase("investigate");
+        setFlipped(new Set()); setFlipping(new Set());
+        setAnaSel(null); setAnaAttempts(0); setAnaCons(null); setAnaScore(0);
+        setScaSel([]); setScaAttempts(0); setScaCons(null); setScaScore(0);
+        setMethSel([]); setMethApplied(false); setMethAttempts(0); setMethScore(0);
+        setAk(k=>k+1);
+      }
+
+      function flipCard(id) {
+        if (flipping.has(id)||flipped.has(id)) return;
+        setFlipping(p=>new Set([...p,id]));
+        setTimeout(()=>{
+          setFlipped(p=>new Set([...p,id]));
+          setFlipping(p=>{const n=new Set(p);n.delete(id);return n;});
+        },200);
+      }
+
+      function submitAnalysis() {
+        if (anaSel===null) return;
+        const isOk = c.analysis.opts[anaSel].ok;
+        const attempts = anaAttempts+1;
+        setAnaAttempts(attempts);
+        if (isOk) {
+          const pts = attempts===1?2:attempts===2?1:0;
+          setAnaScore(pts); setAnaCons(null); setPhase("scale");
+        } else {
+          const consText = c.analysis.cons[anaSel];
+          setAnaCons({text:consText, showAnswer:attempts>=2});
+        }
+      }
+      function retryAnalysis() { setAnaSel(null); setAnaCons(null); }
+      function forceNextFromAnalysis() { setAnaScore(0); setAnaCons(null); setPhase("scale"); }
+
+      function toggleSca(i) { if(scaCons) return; setScaSel(p=>p.includes(i)?p.filter(x=>x!==i):[...p,i]); }
+      function submitScale() {
+        if (!scaSel.length) return;
+        const opts = c.scales.opts;
+        const correctAll = opts.filter(o=>o.ok);
+        const selOk = scaSel.filter(i=>opts[i]?.ok).length;
+        const selBad = scaSel.filter(i=>!opts[i]?.ok);
+        const isOk = selOk===correctAll.length && selBad.length===0;
+        const attempts = scaAttempts+1;
+        setScaAttempts(attempts);
+        if (isOk) {
+          const pts = attempts===1?2:attempts===2?1:0;
+          setScaScore(pts); setScaCons(null); setPhase("intervene");
+        } else {
+          const consText = opts[selBad[0]]?.cons || "Cette combinaison d'échelles n'est pas adaptée à l'âge de cet enfant.";
+          setScaCons({text:consText, showAnswer:attempts>=2});
+        }
+      }
+      function retrySca() { setScaSel([]); setScaCons(null); }
+      function forceNextFromScale() { setScaScore(0); setScaCons(null); setPhase("intervene"); }
+
+      function toggleMeth(i) { if(methApplied) return; setMethSel(p=>p.includes(i)?p.filter(x=>x!==i):[...p,i]); }
+      function applyMethods() {
+        if (!methSel.length) return;
+        const state = childState(c.methods, methSel);
+        const attempts = methAttempts+1;
+        setMethAttempts(attempts);
+        setMethApplied(true);
+        const okSel = c.methods.filter((m,i)=>m.ok&&methSel.includes(i)).length;
+        if (state>=100) {
+          setMethScore(okSel);
+          setTimeout(()=>setPhase("done"),300);
+        } else if (attempts>=2) {
+          setMethScore(okSel);
+        }
+      }
+      function reviseMethods() { setMethApplied(false); }
+
+      function finishCase() {
+        const total = anaScore+scaScore+methScore;
+        const newScores = [...caseScores, {ana:anaScore,sca:scaScore,meth:methScore,max:CASE_MAX(c),total}];
+        setCaseScores(newScores);
+        const newTotal = totalScore+total;
+        setTotalScore(newTotal);
+        if (ci+1<CASES.length) { resetCase(ci+1); }
+        else { saveLb(player,newTotal); setScreen("result"); }
+      }
+
+      const cState = useMemo(()=>childState(c.methods,methSel),[methSel,ci]);
+      const cStateInfo = stateLabel(cState);
+      const pct = TOTAL_MAX>0?Math.round((totalScore/TOTAL_MAX)*100):0;
+      const badge = pct>=85?{icon:"🏆",l:"Expert en DNMS"}:pct>=65?{icon:"⭐",l:"Praticien confirmé"}:pct>=40?{icon:"📚",l:"En bonne voie"}:{icon:"💪",l:"Continue à apprendre"};
+
+      return (
+        <>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+            *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+            @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+            @keyframes pop{0%{transform:scale(.9);opacity:0}65%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+            @keyframes sdown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+            @keyframes cardflip{0%{transform:scale(1) rotateY(0);}50%{transform:scale(.85) rotateY(90deg);opacity:0;}100%{transform:scale(1) rotateY(0);opacity:1;}}
+            @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+            .fadein{animation:fadeUp .3s ease both}
+            .popin{animation:pop .36s ease both}
+            .sdown{animation:sdown .24s ease both}
+            .flipping{animation:cardflip .4s ease both}
+            .clue:not(.revealed):hover{transform:translateY(-3px) scale(1.02);box-shadow:0 8px 24px rgba(26,111,168,.3)!important}
+            .clue{transition:transform .14s,box-shadow .14s;cursor:pointer;}
+            .clue.revealed{cursor:default;}
+            .optcard:not([data-done]):hover{transform:translateY(-2px);border-color:#1A6FA8!important;box-shadow:0 5px 16px rgba(26,111,168,.15)!important}
+            .optcard{transition:transform .14s,border-color .14s,box-shadow .14s;cursor:pointer}
+            .optcard[data-done]{cursor:default}
+            .mrow:not([data-done]):hover{background:#EAF5FF!important;border-color:#1A6FA8!important}
+            .mrow{transition:background .12s,border-color .12s;cursor:pointer}
+            .mrow[data-done]{cursor:default}
+            button{cursor:pointer;border:none;outline:none;}
+            ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#B5D4F4;border-radius:4px}
+          `}</style>
+
+          <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",minHeight:"100vh",background:P.bg,padding:"14px 12px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+
+            {screen==="home" && (
+              <div className="popin" style={{maxWidth:540,width:"100%",textAlign:"center",paddingTop:24}}>
+                <svg width="180" height="120" viewBox="0 0 180 120" fill="none" style={{marginBottom:8}}>
+                  <ellipse cx="90" cy="100" rx="65" ry="14" fill="#C8E6F5" opacity="0.4"/>
+                  <path d="M60 50 Q58 80 90 88 Q122 80 120 50 L120 35 Q120 18 90 16 Q60 18 60 35 Z" fill={P.priL} opacity="0.12"/>
+                  <ellipse cx="90" cy="72" rx="20" ry="13" fill="#FFD4B2"/>
+                  <circle cx="90" cy="55" r="13" fill="#FFB98A"/>
+                  <circle cx="86" cy="54" r="1.5" fill="#1A3A5C"/>
+                  <circle cx="94" cy="54" r="1.5" fill="#1A3A5C"/>
+                  <path d="M86 59 Q90 62 94 59" stroke="#C0714A" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <ellipse cx="70" cy="76" rx="9" ry="6" fill={P.priL} opacity="0.3"/>
+                  <ellipse cx="110" cy="76" rx="9" ry="6" fill={P.priL} opacity="0.3"/>
+                  <rect x="130" y="38" width="5" height="16" rx="2.5" fill={P.pri} opacity="0.45"/>
+                  <rect x="124" y="44" width="16" height="5" rx="2.5" fill={P.pri} opacity="0.45"/>
+                  <circle cx="35" cy="30" r="3.5" fill={P.priL} opacity="0.5"/>
+                  <circle cx="148" cy="28" r="2.5" fill={P.teal} opacity="0.55"/>
+                  <circle cx="156" cy="60" r="4" fill="#E05A3A" opacity="0.3"/>
+                  <circle cx="26" cy="65" r="3" fill={P.priL} opacity="0.4"/>
+                </svg>
+                <h1 style={{fontWeight:800,fontSize:"clamp(22px,5vw,36px)",color:P.pri,margin:"0 0 6px",lineHeight:1.15}}>Gestion de la douleur</h1>
+                <p style={{fontWeight:600,fontSize:14,color:P.teal,margin:"0 0 4px"}}>Approches non médicamenteuses · Enfant 0–6 ans</p>
+                <p style={{fontSize:12,color:P.gray,margin:"0 0 22px"}}>Simulation clinique interactive</p>
+                <div style={{background:"white",borderRadius:18,padding:"16px 18px",marginBottom:18,boxShadow:"0 6px 24px rgba(26,111,168,.09)",textAlign:"left"}}>
+                  <p style={{fontWeight:700,fontSize:13,color:"#1E3A50",margin:"0 0 12px"}}>Comment fonctionne la simulation ?</p>
+                  {[
+                    {icon:"🔍",t:"Investiguer",s:"Retournez les cartes d'indices pour reconstituer le tableau clinique complet"},
+                    {icon:"🩺",t:"Analyser & Évaluer",s:"Classifiez la situation et choisissez l'échelle d'évaluation adaptée"},
+                    {icon:"🎯",t:"Intervenir",s:"Construisez un plan de soin et observez l'état de l'enfant évoluer en temps réel"},
+                  ].map(({icon,t,s},i)=>(
+                    <div key={i} style={{display:"flex",gap:12,padding:"9px 0",borderBottom:i<2?`1px solid ${P.priXL}`:"none",alignItems:"flex-start"}}>
+                      <span style={{fontSize:20,lineHeight:1.3,flexShrink:0,marginTop:1}}>{icon}</span>
+                      <div>
+                        <p style={{margin:0,fontWeight:700,fontSize:13,color:"#1E3A50"}}>{t}</p>
+                        <p style={{margin:"1px 0 0",fontSize:12,color:P.gray}}>{s}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{background:P.priXL,borderRadius:12,padding:"10px 14px",marginBottom:18,textAlign:"left",borderLeft:`3px solid ${P.pri}`}}>
+                  <p style={{fontSize:12,color:P.pri,margin:0,fontWeight:500}}>💡 Si votre analyse n'est pas la bonne, la situation clinique évolue et vous guide vers la bonne stratégie — sans jamais vous dire simplement « faux ».</p>
+                </div>
+                <button onClick={()=>setScreen("name")} style={{background:grad,color:"white",fontSize:16,fontWeight:700,padding:"14px 52px",borderRadius:50,boxShadow:"0 6px 22px rgba(26,111,168,.38)"}}>
+                  Commencer la simulation
+                </button>
+                <p style={{fontSize:12,color:P.gray,marginTop:12}}>5 situations · Classement sauvegardé localement</p>
+              </div>
+            )}
+
+            {screen==="name" && (
+              <div className="popin" style={{maxWidth:360,width:"100%",textAlign:"center",paddingTop:44}}>
+                <div style={{fontSize:50,marginBottom:12}}>👤</div>
+                <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 5px"}}>Qui joue ?</h2>
+                <p style={{color:"#94A3B8",fontSize:13,margin:"0 0 20px"}}>Ton prénom pour le classement</p>
+                <input type="text" placeholder="Ton prénom..." value={nameInput}
+                  onChange={e=>setNameInput(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&startGame()} autoFocus
+                  style={{width:"100%",padding:"13px 16px",fontSize:16,border:`2px solid ${P.priXL}`,borderRadius:13,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:"#1E3A50",background:"white",textAlign:"center",marginBottom:12,display:"block",outline:"none"}}/>
+                <button onClick={startGame} disabled={!nameInput.trim()} style={{width:"100%",padding:13,fontSize:15,fontWeight:700,background:nameInput.trim()?grad:"#E5E7EB",color:nameInput.trim()?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                  C'est parti !
+                </button>
+              </div>
+            )}
+
+            {screen==="game" && (
+              <div style={{maxWidth:660,width:"100%",paddingTop:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:11}}>
+                  <span style={{background:"white",padding:"6px 13px",borderRadius:50,fontSize:13,fontWeight:600,color:P.pri,boxShadow:"0 2px 8px rgba(26,111,168,.1)"}}>{player}</span>
+                  <div style={{display:"flex",gap:4}}>
+                    {CASES.map((_,i)=><div key={i} style={{width:i===ci?26:18,height:6,borderRadius:3,background:i<ci?P.teal:i===ci?P.pri:"rgba(26,111,168,.18)",transition:"all .3s"}}/>)}
+                  </div>
+                  <span style={{background:grad,padding:"6px 13px",borderRadius:50,fontSize:13,fontWeight:700,color:"white"}}>{totalScore} pts</span>
+                </div>
+
+                <div style={{background:"white",borderRadius:16,padding:"14px 16px",marginBottom:10,boxShadow:"0 4px 14px rgba(26,111,168,.08)",borderTop:`4px solid ${P.pri}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                    <span style={{fontSize:30}}>{c.emoji}</span>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
+                      <span style={{fontWeight:800,fontSize:14,color:P.pri}}>{c.tag}</span>
+                      <span style={{background:"#F1F5F9",color:P.gray,fontSize:11,fontWeight:600,padding:"3px 9px",borderRadius:50}}>{c.soin}</span>
+                      {phase!=="investigate" && <span style={{background:P.priXL,color:P.pri,fontSize:11,fontWeight:600,padding:"3px 9px",borderRadius:50}}>{flipped.size}/{c.clues.length} indices</span>}
+                    </div>
+                  </div>
+                  <p style={{fontSize:13.5,color:"#334155",lineHeight:1.7,margin:0}}>{c.base}</p>
+                </div>
+
+                <div style={{display:"flex",gap:5,marginBottom:12}}>
+                  {[["🔍","Indices"],["🩺","Analyse"],["📊","Échelle"],["🎯","Interventions"]].map(([icon,lab],i)=>{
+                    const phaseOrder=["investigate","analyze","scale","intervene","done"];
+                    const currIdx=phaseOrder.indexOf(phase);
+                    const active=currIdx===i, done=currIdx>i;
+                    return (
+                      <div key={i} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"8px 4px",borderRadius:10,fontSize:11,fontWeight:700,background:active?grad:done?P.tealL:"white",color:active?"white":done?P.teal:"#94A3B8",boxShadow:active?"0 3px 10px rgba(26,111,168,.26)":"0 1px 4px rgba(0,0,0,.05)",border:done?`1px solid ${P.teal}`:"1px solid transparent"}}>
+                        <span>{done?"✓":icon}</span><span>{lab}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {phase==="investigate" && (
+                  <div key={`inv-${ci}-${ak}`} className="fadein">
+                    {flipped.size>0 && (
+                      <div className="fadein" style={{background:"white",borderRadius:14,padding:"12px 14px",marginBottom:11,boxShadow:"0 3px 10px rgba(26,111,168,.07)",borderLeft:`3px solid ${P.pri}`}}>
+                        <p style={{fontWeight:700,fontSize:11,color:P.pri,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:.5}}>📋 Tableau clinique en cours de construction</p>
+                        {c.clues.filter(cl=>flipped.has(cl.id)).map(cl=>(
+                          <div key={cl.id} className="sdown" style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid ${P.priXL}`,alignItems:"flex-start"}}>
+                            <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{cl.cat}</span>
+                            <div>
+                              <span style={{fontSize:11.5,fontWeight:700,color:P.pri}}>{cl.lab} : </span>
+                              <span style={{fontSize:11.5,color:"#334155",fontStyle:"italic"}}>{cl.find}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {flipped.size===0 && (
+                      <div style={{background:P.priXL,borderRadius:12,padding:"10px 14px",marginBottom:11,textAlign:"center"}}>
+                        <p style={{margin:0,fontSize:12,color:P.pri,fontWeight:500}}>Retournez les cartes pour collecter des informations sur la situation</p>
+                      </div>
+                    )}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+                      {c.clues.map(cl=>{
+                        const isFlipped=flipped.has(cl.id);
+                        const isFlipping=flipping.has(cl.id);
+                        return (
+                          <div key={cl.id} className={`clue${isFlipped?" revealed":""}${isFlipping?" flipping":""}`}
+                            onClick={()=>flipCard(cl.id)}
+                            style={{background:isFlipped?"white":grad,border:`1px solid ${isFlipped?P.priXL:"transparent"}`,borderRadius:12,padding:"11px 10px",minHeight:96,display:"flex",flexDirection:"column",justifyContent:isFlipped?"flex-start":"center",alignItems:isFlipped?"flex-start":"center",textAlign:isFlipped?"left":"center",boxShadow:isFlipped?"0 2px 8px rgba(26,111,168,.07)":"0 4px 14px rgba(26,111,168,.22)"}}>
+                            {!isFlipped?(
+                              <>
+                                <span style={{fontSize:22,marginBottom:6}}>{cl.cat}</span>
+                                <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"white",lineHeight:1.4}}>{cl.lab}</p>
+                                <p style={{margin:"5px 0 0",fontSize:10,color:"rgba(255,255,255,.65)"}}>Appuyer pour révéler</p>
+                              </>
+                            ):(
+                              <>
+                                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
+                                  <span style={{fontSize:13}}>{cl.cat}</span>
+                                  <p style={{margin:0,fontSize:10.5,fontWeight:700,color:P.pri}}>{cl.lab}</p>
+                                </div>
+                                <p style={{margin:0,fontSize:11,color:"#334155",lineHeight:1.55}}>{cl.find}</p>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                      <div style={{flex:1,height:6,background:P.priXL,borderRadius:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${(flipped.size/c.clues.length)*100}%`,background:grad,borderRadius:3,transition:"width .3s"}}/>
+                      </div>
+                      <span style={{fontSize:12,color:P.pri,fontWeight:700,whiteSpace:"nowrap"}}>{flipped.size}/{c.clues.length} indices</span>
+                    </div>
+                    {flipped.size>=c.minClues ? (
+                      <button className="fadein" onClick={()=>setPhase("analyze")} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13,boxShadow:"0 4px 14px rgba(26,111,168,.28)"}}>
+                        Analyser la situation →
+                      </button>
+                    ) : (
+                      <p style={{textAlign:"center",fontSize:12,color:P.gray,margin:0}}>
+                        Révélez encore {c.minClues-flipped.size} indice{c.minClues-flipped.size>1?"s":""} pour continuer
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {phase==="analyze" && (
+                  <div key={`ana-${ci}-${ak}`} className="fadein">
+                    <div style={{background:"white",borderRadius:13,padding:"10px 14px",marginBottom:11,boxShadow:"0 2px 8px rgba(26,111,168,.07)",borderLeft:`3px solid ${P.teal}`}}>
+                      <p style={{fontWeight:700,fontSize:11,color:P.teal,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:.5}}>📋 Éléments recueillis ({flipped.size})</p>
+                      {c.clues.filter(cl=>flipped.has(cl.id)).map(cl=>(
+                        <div key={cl.id} style={{display:"flex",gap:7,padding:"3px 0",alignItems:"flex-start"}}>
+                          <span style={{fontSize:12,flexShrink:0}}>{cl.cat}</span>
+                          <p style={{margin:0,fontSize:11,color:"#475569",lineHeight:1.5}}><span style={{fontWeight:600}}>{cl.lab} :</span> {cl.find}</p>
+                        </div>
+                      ))}
+                      <button onClick={()=>setPhase("investigate")} style={{background:"none",padding:"5px 0",fontSize:11,color:P.pri,fontWeight:600,marginTop:6,textDecoration:"underline"}}>
+                        + Collecter plus d'indices
+                      </button>
+                    </div>
+                    <p style={{fontWeight:800,fontSize:14,color:"#1E3A50",margin:"0 0 11px",lineHeight:1.5}}>{c.analysis.q}</p>
+                    {anaCons && (
+                      <div className="sdown" style={{background:P.amberL,border:`2px solid ${P.amber}`,borderRadius:13,padding:"12px 14px",marginBottom:11}}>
+                        <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:8}}>
+                          <span style={{fontSize:18,flexShrink:0}}>🔄</span>
+                          <p style={{margin:0,fontSize:13,fontWeight:700,color:P.amber}}>La situation évolue...</p>
+                        </div>
+                        <p style={{fontSize:12.5,color:"#78350F",lineHeight:1.68,margin:"0 0 10px"}}>{anaCons.text}</p>
+                        {!anaCons.showAnswer ? (
+                          <div style={{display:"flex",gap:8}}>
+                            <button onClick={retryAnalysis} style={{flex:1,padding:"9px 12px",fontSize:12,fontWeight:700,background:"white",color:P.amber,borderRadius:10,border:`1.5px solid ${P.amber}`}}>Reconsidérer</button>
+                            <button onClick={()=>setPhase("investigate")} style={{flex:1,padding:"9px 12px",fontSize:12,fontWeight:700,background:"white",color:P.pri,borderRadius:10,border:`1.5px solid ${P.pri}`}}>Plus d'indices</button>
+                          </div>
+                        ) : (
+                          <div style={{background:"white",borderRadius:10,padding:"10px 12px",marginTop:4}}>
+                            <p style={{fontWeight:700,fontSize:12,color:P.teal,margin:"0 0 4px"}}>✅ Réponse attendue :</p>
+                            <p style={{fontSize:12,color:"#1E3A50",fontWeight:600,margin:"0 0 4px"}}>{c.analysis.opts.find(o=>o.ok)?.l}</p>
+                            <p style={{fontSize:12,color:"#475569",lineHeight:1.65,margin:"0 0 8px"}}>{c.analysis.expl}</p>
+                            <button onClick={forceNextFromAnalysis} style={{width:"100%",padding:"9px",fontSize:12,fontWeight:700,background:grad,color:"white",borderRadius:9}}>
+                              Continuer → Choisir l'échelle
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!anaCons?.showAnswer && (
+                      <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:11}}>
+                        {c.analysis.opts.map((opt,i)=>{
+                          let bg="white",brd="2px solid #E2EBF0",col="#334155";
+                          if(anaSel===i){bg=P.priXL;brd=`2px solid ${P.pri}`;col=P.pri;}
+                          return (
+                            <div key={i} className="optcard" data-done={anaCons||undefined}
+                              onClick={()=>!anaCons&&setAnaSel(i)}
+                              style={{background:bg,border:brd,borderRadius:12,padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
+                              <div>
+                                <p style={{margin:0,fontWeight:700,fontSize:13,color:col}}>{opt.l}</p>
+                                <p style={{margin:0,fontSize:11.5,color:col,opacity:.75,marginTop:1}}>{opt.s}</p>
+                              </div>
+                              <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${anaSel===i?P.pri:"#CBD5E1"}`,background:anaSel===i?P.pri:"white",flexShrink:0,marginLeft:10,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                {anaSel===i&&<div style={{width:6,height:6,borderRadius:"50%",background:"white"}}/>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!anaCons && (
+                      <button onClick={submitAnalysis} disabled={anaSel===null} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:anaSel!==null?grad:"#E5E7EB",color:anaSel!==null?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                        Valider mon analyse
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {phase==="scale" && (
+                  <div key={`sca-${ci}-${ak}`} className="fadein">
+                    <div style={{background:P.tealL,borderRadius:12,padding:"9px 13px",marginBottom:11,display:"flex",gap:8,alignItems:"center",borderLeft:`3px solid ${P.teal}`}}>
+                      <span style={{fontSize:14}}>✅</span>
+                      <p style={{margin:0,fontSize:12,color:P.teal,fontWeight:600}}>Analyse validée — passez maintenant à l'évaluation</p>
+                    </div>
+                    <p style={{fontWeight:800,fontSize:14,color:"#1E3A50",margin:"0 0 5px",lineHeight:1.5}}>{c.scales.q}</p>
+                    <p style={{fontSize:11,color:P.gray,margin:"0 0 11px"}}>(Plusieurs réponses possibles)</p>
+                    {scaCons && (
+                      <div className="sdown" style={{background:P.amberL,border:`2px solid ${P.amber}`,borderRadius:13,padding:"12px 14px",marginBottom:11}}>
+                        <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:8}}>
+                          <span style={{fontSize:18,flexShrink:0}}>🔄</span>
+                          <p style={{margin:0,fontSize:13,fontWeight:700,color:P.amber}}>Cette échelle pose problème...</p>
+                        </div>
+                        <p style={{fontSize:12.5,color:"#78350F",lineHeight:1.68,margin:"0 0 10px"}}>{scaCons.text}</p>
+                        {!scaCons.showAnswer ? (
+                          <button onClick={retrySca} style={{width:"100%",padding:"9px",fontSize:12,fontWeight:700,background:"white",color:P.amber,borderRadius:10,border:`1.5px solid ${P.amber}`}}>
+                            Réviser mon choix d'échelle
+                          </button>
+                        ) : (
+                          <div style={{background:"white",borderRadius:10,padding:"10px 12px",marginTop:4}}>
+                            <p style={{fontWeight:700,fontSize:12,color:P.teal,margin:"0 0 4px"}}>✅ Échelle(s) recommandée(s) :</p>
+                            <p style={{fontSize:12,color:"#1E3A50",fontWeight:600,margin:"0 0 4px"}}>{c.scales.opts.filter(o=>o.ok).map(o=>o.l).join(" · ")}</p>
+                            <p style={{fontSize:12,color:"#475569",lineHeight:1.65,margin:"0 0 8px"}}>{c.scales.expl}</p>
+                            <button onClick={forceNextFromScale} style={{width:"100%",padding:"9px",fontSize:12,fontWeight:700,background:grad,color:"white",borderRadius:9}}>
+                              Continuer → Interventions
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!scaCons?.showAnswer && (
+                      <>
+                        <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:11}}>
+                          {c.scales.opts.map((opt,i)=>{
+                            const checked=scaSel.includes(i);
+                            let bg="white",brd="2px solid #E2EBF0";
+                            let boxBg=checked?P.pri:"white",boxBrd=checked?P.pri:"#CBD5E1";
+                            if(checked){bg=P.priXL;brd=`2px solid ${P.pri}`;}
+                            return (
+                              <div key={i} className="optcard" onClick={()=>toggleSca(i)}
+                                style={{background:bg,border:brd,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
+                                <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${boxBrd}`,background:boxBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {checked&&<span style={{color:"white",fontSize:10,fontWeight:700}}>✓</span>}
+                                </div>
+                                <div>
+                                  <p style={{margin:0,fontWeight:700,fontSize:13,color:"#334155"}}>{opt.l}</p>
+                                  <p style={{margin:0,fontSize:11.5,color:"#334155",opacity:.75,marginTop:1}}>{opt.s}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button onClick={submitScale} disabled={!scaSel.length} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:scaSel.length?grad:"#E5E7EB",color:scaSel.length?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                          Valider mon choix d'échelle
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {phase==="intervene" && (
+                  <div key={`meth-${ci}-${ak}`} className="fadein">
+                    <div style={{background:"white",borderRadius:14,padding:"12px 14px",marginBottom:11,boxShadow:"0 3px 10px rgba(26,111,168,.08)",border:`2px solid ${cStateInfo.bg}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                        <span style={{fontSize:26}}>{cStateInfo.icon}</span>
+                        <div style={{flex:1}}>
+                          <p style={{fontWeight:700,fontSize:12,color:cStateInfo.col,margin:"0 0 5px"}}>{cStateInfo.label}</p>
+                          <div style={{height:8,background:"#F1F5F9",borderRadius:4,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${cState}%`,background:cState>=100?`linear-gradient(90deg,${P.teal},${P.green})`:cState>=65?`linear-gradient(90deg,${P.teal},${P.teal})`:cState>=35?`linear-gradient(90deg,${P.amber},${P.amber})`:`linear-gradient(90deg,${P.red},${P.red})`,borderRadius:4,transition:"width .5s ease"}}/>
+                          </div>
+                        </div>
+                        <span style={{fontWeight:800,fontSize:16,color:cStateInfo.col}}>{Math.round(cState)}%</span>
+                      </div>
+                      {!methApplied && <p style={{margin:0,fontSize:11,color:P.gray}}>Sélectionnez vos interventions et observez l'évolution en temps réel</p>}
+                    </div>
+                    <p style={{fontWeight:800,fontSize:14,color:"#1E3A50",margin:"0 0 11px",lineHeight:1.5}}>
+                      Construisez votre plan de soin
+                      <span style={{fontSize:11,fontWeight:400,color:P.gray,marginLeft:6}}>· cochez toutes les interventions que vous mettez en place</span>
+                    </p>
+                    <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:11}}>
+                      {c.methods.map((m,i)=>{
+                        const checked=methSel.includes(i);
+                        const revealed=methApplied;
+                        let bg="white",brd="2px solid #E2EBF0",tCol="#334155";
+                        let boxBg=checked?P.pri:"white",boxBrd=checked?P.pri:"#CBD5E1";
+                        let badge=null,expl=null;
+                        if(revealed&&checked){
+                          if(m.ok){bg=P.greenL;brd=`2px solid ${P.green}`;tCol=P.green;boxBg=P.green;boxBrd=P.green;badge={t:"✓ Adapté",c:P.green,bg:P.greenL};expl={text:m.c_ok,border:P.green,bg:"#F0FDF4",col:"#14532D"};}
+                          else{bg=P.redL;brd=`2px solid ${P.red}`;tCol=P.red;boxBg=P.red;boxBrd=P.red;badge={t:"Effet négatif",c:P.red,bg:P.redL};expl={text:m.c_ko,border:P.red,bg:P.redL,col:"#7F1D1D"};}
+                        } else if(revealed&&!checked&&methAttempts>=2&&m.ok){
+                          bg=P.amberL;brd=`2px solid ${P.amber}`;tCol=P.amber;
+                          badge={t:"Non appliqué",c:P.amber,bg:P.amberL};
+                          expl={text:m.c_ok,border:P.amber,bg:P.amberL,col:"#78350F"};
+                        } else if(checked){bg=P.priXL;brd=`2px solid ${P.pri}`;}
+                        return (
+                          <div key={i}>
+                            <div className="mrow" data-done={methApplied||undefined}
+                              onClick={()=>toggleMeth(i)}
+                              style={{background:bg,border:brd,borderRadius:revealed&&expl?"12px 12px 0 0":12,padding:"10px 13px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
+                              <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${boxBrd}`,background:boxBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                {checked&&<span style={{color:"white",fontSize:10,fontWeight:700}}>✓</span>}
+                              </div>
+                              <p style={{margin:0,fontSize:13,fontWeight:500,color:tCol,flex:1,lineHeight:1.5}}>{m.l}</p>
+                              {badge&&<span style={{fontSize:11,fontWeight:700,color:badge.c,background:badge.bg,padding:"3px 7px",borderRadius:50,whiteSpace:"nowrap",flexShrink:0}}>{badge.t}</span>}
+                            </div>
+                            {revealed&&expl?.text&&(
+                              <div className="sdown" style={{background:expl.bg,borderLeft:`3px solid ${expl.border}`,borderRight:`1px solid ${expl.border}`,borderBottom:`1px solid ${expl.border}`,borderRadius:"0 0 12px 12px",padding:"9px 13px"}}>
+                                <p style={{margin:0,fontSize:12,color:expl.col,lineHeight:1.65}}>{expl.text}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!methApplied ? (
+                      <button onClick={applyMethods} disabled={!methSel.length} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:methSel.length?grad:"#E5E7EB",color:methSel.length?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                        Mettre en place les interventions →
+                      </button>
+                    ) : cState>=100 ? (
+                      <div className="fadein" style={{background:P.greenL,border:`2px solid ${P.green}`,borderRadius:14,padding:"14px",marginTop:4,textAlign:"center"}}>
+                        <p style={{fontWeight:800,fontSize:15,color:P.green,margin:"0 0 5px"}}>😊 Objectif atteint !</p>
+                        <p style={{fontSize:13,color:"#166534",lineHeight:1.65,margin:"0 0 10px"}}>{c.win}</p>
+                        <button onClick={()=>setPhase("done")} style={{width:"100%",padding:12,fontSize:14,fontWeight:700,background:`linear-gradient(135deg,${P.teal},${P.green})`,color:"white",borderRadius:12}}>
+                          {ci+1<CASES.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                        </button>
+                      </div>
+                    ) : methAttempts<2 ? (
+                      <div className="fadein" style={{background:P.amberL,border:`2px solid ${P.amber}`,borderRadius:13,padding:"12px 14px",marginTop:4}}>
+                        <p style={{fontWeight:700,fontSize:13,color:P.amber,margin:"0 0 6px"}}>🔄 Ajustez votre plan de soin</p>
+                        <p style={{fontSize:12,color:"#78350F",lineHeight:1.65,margin:"0 0 10px"}}>Certaines de vos interventions produisent des effets inattendus. Observez les résultats et révisez votre stratégie.</p>
+                        <button onClick={reviseMethods} style={{width:"100%",padding:"10px",fontSize:13,fontWeight:700,background:"white",color:P.amber,borderRadius:10,border:`1.5px solid ${P.amber}`}}>
+                          Réviser mon plan de soin
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="fadein">
+                        <div style={{background:P.priXL,border:`2px solid ${P.pri}`,borderRadius:13,padding:"12px 14px",marginBottom:10}}>
+                          <p style={{fontWeight:700,fontSize:13,color:P.pri,margin:"0 0 6px"}}>📚 Interventions recommandées</p>
+                          <p style={{fontSize:12,color:"#1E3A50",lineHeight:1.65,margin:0}}>{c.win}</p>
+                        </div>
+                        <button onClick={()=>setPhase("done")} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
+                          {ci+1<CASES.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {phase==="done" && (
+                  <div key={`done-${ci}`} className="popin" style={{textAlign:"center"}}>
+                    <div style={{background:"white",borderRadius:18,padding:"22px",marginBottom:14,boxShadow:"0 6px 22px rgba(26,111,168,.09)",borderTop:`4px solid ${P.teal}`}}>
+                      <div style={{fontSize:48,marginBottom:8}}>✅</div>
+                      <h3 style={{fontWeight:800,fontSize:18,color:P.teal,margin:"0 0 6px"}}>{c.tag} — terminé</h3>
+                      <p style={{fontSize:13,color:"#475569",lineHeight:1.7,margin:"0 0 14px"}}>{c.win}</p>
+                      <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+                        {[{l:"Analyse",v:anaScore,m:2},{l:"Échelle",v:scaScore,m:2},{l:"Méthodes",v:methScore,m:c.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
+                          <div key={l} style={{flex:1,background:P.priXL,borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+                            <p style={{fontWeight:800,fontSize:20,color:P.pri,margin:"0 0 2px"}}>{v}<span style={{fontSize:12,color:"#94A3B8",fontWeight:400}}>/{m}</span></p>
+                            <p style={{fontSize:11,color:P.gray,margin:0}}>{l}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={finishCase} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
+                      {ci+1<CASES.length?`Situation ${ci+2} : ${CASES[ci+1].tag} →`:"Voir mes résultats 🎉"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {screen==="result" && (
+              <div className="popin" style={{maxWidth:520,width:"100%",paddingTop:20}}>
+                <div style={{textAlign:"center",marginBottom:18}}>
+                  <div style={{fontSize:56,marginBottom:7}}>{badge.icon}</div>
+                  <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 3px"}}>{player}</h2>
+                  <p style={{fontWeight:600,fontSize:15,color:P.teal,margin:0}}>{badge.l}</p>
+                </div>
+                <div style={{background:"white",borderRadius:18,padding:"20px",marginBottom:12,boxShadow:"0 6px 22px rgba(26,111,168,.09)",textAlign:"center",borderTop:`4px solid ${P.pri}`}}>
+                  <div style={{fontWeight:800,fontSize:46,color:P.pri,lineHeight:1}}>{totalScore}<span style={{fontSize:16,color:"#CBD5E1",fontWeight:400}}> / {TOTAL_MAX}</span></div>
+                  <p style={{fontSize:12,color:"#CBD5E1",margin:"3px 0 12px"}}>points</p>
+                  <div style={{height:9,background:P.priXL,borderRadius:5,overflow:"hidden",marginBottom:5}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:grad,borderRadius:5,transition:"width 1.2s ease"}}/>
+                  </div>
+                  <p style={{fontSize:13,color:P.pri,fontWeight:700,margin:0}}>{pct}% de réussite</p>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  {CASES.map((cas,i)=>{
+                    const s=caseScores[i]||{};
+                    return (
+                      <div key={i} style={{background:"white",borderRadius:13,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 2px 7px rgba(26,111,168,.06)",borderLeft:`3px solid ${(s.total||0)>=(CASE_MAX(cas)*0.7)?P.teal:P.pri}`}}>
+                        <span style={{fontSize:20}}>{cas.emoji}</span>
+                        <div style={{flex:1}}>
+                          <p style={{margin:0,fontWeight:700,fontSize:13,color:"#1E3A50"}}>{cas.tag}</p>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:3}}>
+                            {[{l:"Analyse",v:s.ana,m:2},{l:"Échelle",v:s.sca,m:2},{l:"Méthodes",v:s.meth,m:cas.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
+                              <span key={l} style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:50,background:v===m?P.greenL:v>0?P.amberL:P.redL,color:v===m?P.green:v>0?P.amber:P.red}}>
+                                {l} {v}/{m}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <span style={{fontWeight:800,fontSize:15,color:P.pri}}>{s.total||0} pts</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",gap:9}}>
+                  <button onClick={()=>setScreen("leaderboard")} style={{flex:1,background:"white",color:P.pri,fontSize:13,fontWeight:700,padding:13,borderRadius:13,border:`2px solid ${P.priXL}`}}>🏆 Classement</button>
+                  <button onClick={()=>{setNameInput("");setScreen("home");}} style={{flex:1,background:grad,color:"white",fontSize:13,fontWeight:700,padding:13,borderRadius:13}}>🔄 Rejouer</button>
+                </div>
+              </div>
+            )}
+
+            {screen==="leaderboard" && (
+              <div style={{maxWidth:460,width:"100%",paddingTop:20}}>
+                <div style={{textAlign:"center",marginBottom:14}}>
+                  <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 3px"}}>🏆 Classement</h2>
+                  <p style={{fontSize:12,color:"#94A3B8",margin:0}}>Score maximum : {TOTAL_MAX} points</p>
+                </div>
+                {lb.length===0 ? (
+                  <div style={{background:"white",borderRadius:16,padding:28,textAlign:"center",color:"#CBD5E1",fontSize:14}}>Soyez le premier !</div>
+                ) : (
+                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                    {lb.map((e,i)=>(
+                      <div key={i} style={{background:i===0?"#FFFDE7":"white",borderRadius:12,padding:"10px 15px",display:"flex",alignItems:"center",gap:10,border:i===0?"2px solid #FFD700":`1px solid ${P.priXL}`}}>
+                        <span style={{fontSize:17,minWidth:22}}>{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
+                        <span style={{flex:1,fontWeight:700,fontSize:14,color:"#1E3A50"}}>{e.name}</span>
+                        <span style={{fontSize:11,color:"#94A3B8"}}>{Math.round((e.score/TOTAL_MAX)*100)}%</span>
+                        <span style={{fontWeight:800,fontSize:15,color:P.pri}}>{e.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:9}}>
+                  <button onClick={()=>setScreen("result")} style={{flex:1,background:"white",color:P.pri,fontSize:13,fontWeight:700,padding:12,borderRadius:12,border:`2px solid ${P.priXL}`}}>← Résultats</button>
+                  <button onClick={()=>{setNameInput("");setScreen("home");}} style={{flex:1,background:grad,color:"white",fontSize:13,fontWeight:700,padding:12,borderRadius:12}}>🔄 Rejouer</button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App/>);
+  </script>
+</body>
+</html>
