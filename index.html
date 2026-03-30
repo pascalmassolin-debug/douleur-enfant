@@ -171,10 +171,10 @@
         scales:{
           q:"Quelle(s) échelle(s) pour évaluer cet enfant de 4 ans avant et pendant le soin ?",
           opts:[
-            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · validée dès ~4 ans si compréhension suffisante",ok:true,cons:null},
-            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément ou si auto-évaluation impossible",ok:true,cons:null},
-            {l:"EVA (Échelle Visuelle Analogique)",s:"Trop abstraite avant 8 ans · non recommandée ici",ok:false,cons:"Vous présentez l'EVA à l'enfant de 4 ans. Il regarde la réglette, la manipule, mais ne parvient pas à exprimer son vécu sur une échelle spatiale abstraite. L'EVA requiert une maturité cognitive accessible seulement vers 8 ans."},
-            {l:"DAN (Douleur Aiguë Nouveau-né)",s:"Réservée aux 0–3 mois · inadaptée",ok:false,cons:"Vous utilisez la DAN sur cet enfant de 4 ans. Les items conçus pour observer les réflexes néonataux ne correspondent pas du tout au comportement d'un enfant de 4 ans. Le score obtenu est cliniquement non interprétable."},
+            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · validée dès ~4 ans si compréhension suffisante",ok:true,cons:null,cons_missing:"La FPS-R est recommandée en priorité à 4 ans si la compréhension est suffisante. La FLACC/EVENDOL seule ne capture pas la dimension d'auto-évaluation qui devient accessible à cet âge."},
+            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément ou si auto-évaluation impossible",ok:true,cons:null,cons_missing:"La FLACC/EVENDOL est bien indiquée, mais à 4 ans l'auto-évaluation est possible. La FPS-R doit être proposée en priorité, avec FLACC/EVENDOL en complément si l'enfant ne coopère pas."},
+            {l:"EVA (Échelle Visuelle Analogique)",s:"Trop abstraite avant 8 ans · non recommandée ici",ok:false,cons:"Vous présentez l'EVA à l'enfant de 4 ans. Il regarde la réglette, la manipule, mais ne parvient pas à exprimer son vécu sur une échelle spatiale abstraite. L'EVA requiert une maturité cognitive accessible seulement vers 8 ans.",cons_missing:null},
+            {l:"DAN (Douleur Aiguë Nouveau-né)",s:"Réservée aux 0–3 mois · inadaptée",ok:false,cons:"Vous utilisez la DAN sur cet enfant de 4 ans. Les items conçus pour observer les réflexes néonataux ne correspondent pas du tout au comportement d'un enfant de 4 ans. Le score obtenu est cliniquement non interprétable.",cons_missing:null},
           ],
           multi:true,
           expl:"À 4 ans : FPS-R recommandée en priorité si compréhension suffisante. Compléter par FLACC/EVENDOL si anxiété intense. La combinaison auto + hétéro est recommandée pour les 4–6 ans.",
@@ -219,10 +219,10 @@
         scales:{
           q:"Quelle(s) échelle(s) pour évaluer cet enfant de 5 ans ?",
           opts:[
-            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · recommandée en priorité à 5 ans",ok:true,cons:null},
-            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément si l'enfant ne coopère pas",ok:true,cons:null},
-            {l:"DAN",s:"0–3 mois uniquement · inadaptée",ok:false,cons:"Vous tentez la DAN sur cet enfant de 5 ans. Les critères néonataux sont totalement inadaptés à son stade de développement. Le résultat est cliniquement sans valeur."},
-            {l:"EVA",s:"Trop abstraite avant 8 ans",ok:false,cons:"Vous présentez l'EVA. L'enfant saisit la réglette et la regarde sans comprendre comment y exprimer son ressenti. Cette représentation spatiale abstraite de la douleur n'est accessible qu'à partir de 8 ans environ."},
+            {l:"FPS-R (Échelle des visages)",s:"Auto-évaluation · recommandée en priorité à 5 ans",ok:true,cons:null,cons_missing:"La FPS-R est recommandée en priorité à 5 ans. FLACC/EVENDOL seule ne permet pas l'auto-évaluation — or cet enfant peut exprimer son ressenti si on lui propose le bon outil."},
+            {l:"FLACC ou EVENDOL",s:"Hétéroévaluation · en complément si l'enfant ne coopère pas",ok:true,cons:null,cons_missing:"La FPS-R est bien indiquée mais à 5 ans, si l'enfant est mutique ou peu coopérant, FLACC/EVENDOL doit compléter l'évaluation. La combinaison auto + hétéro est la référence pour les 4–6 ans."},
+            {l:"DAN",s:"0–3 mois uniquement · inadaptée",ok:false,cons:"Vous tentez la DAN sur cet enfant de 5 ans. Les critères néonataux sont totalement inadaptés à son stade de développement. Le résultat est cliniquement sans valeur.",cons_missing:null},
+            {l:"EVA",s:"Trop abstraite avant 8 ans",ok:false,cons:"Vous présentez l'EVA. L'enfant saisit la réglette et la regarde sans comprendre comment y exprimer son ressenti. Cette représentation spatiale abstraite de la douleur n'est accessible qu'à partir de 8 ans environ.",cons_missing:null},
           ],
           multi:true,
           expl:"À 5 ans : FPS-R en priorité. Compléter par FLACC/EVENDOL si l'enfant est mutique. La combinaison auto + hétéro est recommandée pour les 4–6 ans.",
@@ -406,7 +406,13 @@
           const pts = attempts===1?2:attempts===2?1:0;
           setScaScore(pts); setScaCons(null); setPhase("intervene");
         } else {
-          const consText = opts[selBad[0]]?.cons || "Cette combinaison d'échelles n'est pas adaptée à l'âge de cet enfant.";
+          let consText;
+          if (selBad.length > 0) {
+            consText = opts[selBad[0]]?.cons || "Cette échelle n'est pas adaptée à l'âge de cet enfant.";
+          } else {
+            const firstMissingIdx = opts.findIndex((o,i) => o.ok && !scaSel.includes(i));
+            consText = (firstMissingIdx>=0 && opts[firstMissingIdx]?.cons_missing) || "Votre sélection est partiellement correcte, mais il manque une ou plusieurs échelles recommandées pour cet âge.";
+          }
           setScaCons({text:consText, showAnswer:attempts>=2});
         }
       }
