@@ -47,8 +47,8 @@
 
     const CASES = [
       {
-        id:1, emoji:"👶", tag:"Nourrisson · 4 mois", soin:"Prise de sang",
-        base:"Vous entrez dans la salle. Un nourrisson de 4 mois est posé sur la table d'examen pour une prise de sang. Il pleure. Sa maman est assise à côté.",
+        id:1, emoji:"👶", tag:"Lina · Nourrisson · 4 mois", soin:"Prise de sang",
+        base:"Vous entrez dans la salle. Lina, 4 mois, est installée sur la table d'examen pour une prise de sang. Elle pleure. Sa maman est assise à côté d'elle.",
         clues:[
           {id:"c1a",cat:"👁️",lab:"Observer la mimique",find:"Expression peu marquée entre les pleurs. Pas de grimace franche ni de sillon naso-labial creusé visible."},
           {id:"c1b",cat:"👁️",lab:"Observer le tonus",find:"Corps globalement tonique mais non crispé. Membres en flexion physiologique habituelle."},
@@ -95,8 +95,8 @@
         win:"La ponction s'est déroulée avec un score de douleur minimal. La maman, impliquée activement dans le soin, repart rassurée et avec confiance en l'équipe.",
       },
       {
-        id:2, emoji:"😣", tag:"Enfant · 3 ans", soin:"Retrait de pansement",
-        base:"Un enfant de 3 ans est dans la salle de soin pour un retrait de pansement au genou. Il pleure, crie 'Arrête !' et pousse la main du soignant.",
+        id:2, emoji:"😣", tag:"Noé · Enfant · 3 ans", soin:"Retrait de pansement",
+        base:"Noé, 3 ans, est installé dans la salle de soin pour un retrait de pansement au genou. Il pleure, crie 'Arrête !' et pousse la main du soignant.",
         clues:[
           {id:"c2a",cat:"📋",lab:"Observer le moment exact du geste",find:"Les cris et le retrait de main surviennent précisément au moment où vous tirez sur le pansement. Avant le toucher, il était juste anxieux."},
           {id:"c2b",cat:"👁️",lab:"Observer la mimique pendant le geste",find:"Grimace franche pendant le retrait : sourcils froncés, yeux plissés, bouche ouverte. Sillon naso-labial creusé."},
@@ -143,8 +143,8 @@
         win:"Le retrait s'est déroulé avec une détresse réduite. L'enfant a coopéré quelques instants. Le parent repart avec des stratégies à réutiliser à domicile.",
       },
       {
-        id:3, emoji:"😰", tag:"Enfant · 4 ans", soin:"Prise de sang (soin non débuté)",
-        base:"Un enfant de 4 ans s'agrippe à son parent dans le couloir. Il pleure et répète 'Non, non !' Il n'a pas encore été touché.",
+        id:3, emoji:"😰", tag:"Inès · Enfant · 4 ans", soin:"Prise de sang (soin non débuté)",
+        base:"Inès, 4 ans, s'agrippe à son parent dans le couloir. Elle pleure et répète 'Non, non !' Elle n'a pas encore été touchée.",
         clues:[
           {id:"c3a",cat:"📋",lab:"Vérifier si le soin a commencé",find:"La salle est vide. Aucun geste n'a été réalisé. Le matériel n'est pas encore sorti. L'enfant est dans le couloir."},
           {id:"c3b",cat:"📋",lab:"Explorer l'histoire du soin",find:"L'enfant reconnaît les lieux — il y est déjà venu. Le parent rapporte qu'il commence à pleurer dès l'entrée du bâtiment."},
@@ -191,8 +191,8 @@
         win:"L'enfant a traversé le soin avec une anxiété modérée. En partant, il dit : 'C'était pas aussi terrible.' Le parent vous remercie.",
       },
       {
-        id:4, emoji:"🤫", tag:"Enfant · 5 ans", soin:"Perfusion en cours",
-        base:"Vous entrez dans une chambre. Un enfant de 5 ans porteur d'une perfusion est allongé, immobile. Il ne parle pas. Il regarde le mur.",
+        id:4, emoji:"🤫", tag:"Sacha · Enfant · 5 ans", soin:"Perfusion en cours",
+        base:"Vous entrez dans une chambre. Sacha, 5 ans, porteur d'une perfusion, est allongé, immobile. Il ne parle pas. Il regarde le mur.",
         clues:[
           {id:"c4a",cat:"💬",lab:"Interroger le parent présent",find:"« Il est bizarre depuis tout à l'heure. D'habitude il n'arrête pas de parler. Là, il ne répond plus rien. »"},
           {id:"c4b",cat:"👁️",lab:"Observer attentivement la mimique",find:"Sourcils légèrement froncés, légère crispation autour des yeux. Difficile à évaluer car il tourne la tête."},
@@ -239,8 +239,8 @@
         win:"Après évaluation (FPS-R 4/10), la prise en charge est mise en place. À la réévaluation : 2/10. L'enfant accepte un câlin de son parent.",
       },
       {
-        id:5, emoji:"😖", tag:"Enfant · 2 ans", soin:"Injection intramusculaire",
-        base:"Un enfant de 2 ans est allongé pour une injection intramusculaire. Il ne pleure pas encore, mais vous observez des modifications physiques.",
+        id:5, emoji:"😖", tag:"Adam · Enfant · 2 ans", soin:"Injection intramusculaire",
+        base:"Adam, 2 ans, est allongé pour une injection intramusculaire. Il ne pleure pas encore, mais vous observez des modifications physiques.",
         clues:[
           {id:"c5a",cat:"👁️",lab:"Observer les membres inférieurs",find:"Jambes tendues, rigides, immobiles. Position anormale pour son âge — hypertonie des membres inférieurs."},
           {id:"c5b",cat:"🌡️",lab:"Observer la respiration",find:"Respiration rapide et superficielle (~40 mouvements/min). Nettement au-dessus de la normale pour un enfant de 2 ans."},
@@ -309,6 +309,8 @@
       const [screen, setScreen] = useState("home");
       const [nameInput, setNameInput] = useState("");
       const [player, setPlayer] = useState("");
+      const [selectedCases, setSelectedCases] = useState([]);
+      const [caseCount, setCaseCount] = useState(1);
       const [ci, setCi] = useState(0);
       const [phase, setPhase] = useState("investigate");
       const [flipped, setFlipped] = useState(new Set());
@@ -346,16 +348,31 @@
       async function saveLb(name,score) {
         try {
           const k=`dnmsescape_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-          await window.storage.set(k,JSON.stringify({name,score,max:TOTAL_MAX,ts:Date.now()}));
+          await window.storage.set(k,JSON.stringify({name,score,max:selectedTotalMax,count:selectedCases.length,ts:Date.now()}));
           loadLb();
         } catch {}
       }
 
-      const c = CASES[ci];
+      const c = selectedCases[ci] || CASES[0];
+
+      function shuffleArray(arr) {
+        const a = [...arr];
+        for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+        return a;
+      }
+
+      function goToChoose() {
+        if (!nameInput.trim()) return;
+        setScreen("choose");
+      }
 
       function startGame() {
         const n=nameInput.trim(); if(!n) return;
-        setPlayer(n); resetCase(0); setTotalScore(0); setCaseScores([]); setAk(k=>k+1); setScreen("game");
+        const shuffled = shuffleArray(CASES);
+        const chosen = caseCount==="all" ? shuffled : shuffled.slice(0, Number(caseCount));
+        setSelectedCases(chosen);
+        setPlayer(n); setTotalScore(0); setCaseScores([]);
+        resetCase(0); setScreen("game");
       }
 
       function resetCase(idx) {
@@ -442,13 +459,14 @@
         setCaseScores(newScores);
         const newTotal = totalScore+total;
         setTotalScore(newTotal);
-        if (ci+1<CASES.length) { resetCase(ci+1); }
+        if (ci+1<selectedCases.length) { resetCase(ci+1); }
         else { saveLb(player,newTotal); setScreen("result"); }
       }
 
       const cState = useMemo(()=>childState(c.methods,methSel),[methSel,ci]);
       const cStateInfo = stateLabel(cState);
-      const pct = TOTAL_MAX>0?Math.round((totalScore/TOTAL_MAX)*100):0;
+      const selectedTotalMax = selectedCases.reduce((s,c)=>s+CASE_MAX(c),0);
+      const pct = selectedTotalMax>0?Math.round((totalScore/selectedTotalMax)*100):0;
       const badge = pct>=85?{icon:"🏆",l:"Expert en DNMS"}:pct>=65?{icon:"⭐",l:"Praticien confirmé"}:pct>=40?{icon:"📚",l:"En bonne voie"}:{icon:"💪",l:"Continue à apprendre"};
 
       return (
@@ -535,11 +553,45 @@
                 <p style={{color:"#94A3B8",fontSize:13,margin:"0 0 20px"}}>Ton prénom pour le classement</p>
                 <input type="text" placeholder="Ton prénom..." value={nameInput}
                   onChange={e=>setNameInput(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&startGame()} autoFocus
+                  onKeyDown={e=>e.key==="Enter"&&nameInput.trim()&&goToChoose()} autoFocus
                   style={{width:"100%",padding:"13px 16px",fontSize:16,border:`2px solid ${P.priXL}`,borderRadius:13,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:"#1E3A50",background:"white",textAlign:"center",marginBottom:12,display:"block",outline:"none"}}/>
-                <button onClick={startGame} disabled={!nameInput.trim()} style={{width:"100%",padding:13,fontSize:15,fontWeight:700,background:nameInput.trim()?grad:"#E5E7EB",color:nameInput.trim()?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
-                  C'est parti !
+                <button onClick={goToChoose} disabled={!nameInput.trim()} style={{width:"100%",padding:13,fontSize:15,fontWeight:700,background:nameInput.trim()?grad:"#E5E7EB",color:nameInput.trim()?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                  Continuer →
                 </button>
+              </div>
+            )}
+
+            {screen==="choose" && (
+              <div className="popin" style={{maxWidth:420,width:"100%",textAlign:"center",paddingTop:36}}>
+                <div style={{fontSize:46,marginBottom:10}}>🎲</div>
+                <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 5px"}}>Combien de situations ?</h2>
+                <p style={{color:"#94A3B8",fontSize:13,margin:"0 0 22px"}}>Les situations seront tirées au sort, sans répétition</p>
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+                  {[
+                    {v:1,icon:"⚡",t:"1 situation",s:"Rapide · idéal pour un passage court"},
+                    {v:3,icon:"🎯",t:"3 situations",s:"Parcours intermédiaire"},
+                    {v:"all",icon:"🏥",t:"Toutes les situations",s:`Parcours complet · ${CASES.length} situations`},
+                  ].map(({v,icon,t,s})=>{
+                    const sel=caseCount===v;
+                    return (
+                      <div key={String(v)} className="optcard" onClick={()=>setCaseCount(v)}
+                        style={{background:sel?P.priXL:"white",border:`2px solid ${sel?P.pri:"#E2EBF0"}`,borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:13,textAlign:"left",boxShadow:"0 2px 8px rgba(26,111,168,.06)"}}>
+                        <span style={{fontSize:26,flexShrink:0}}>{icon}</span>
+                        <div style={{flex:1}}>
+                          <p style={{margin:0,fontWeight:700,fontSize:15,color:sel?P.pri:"#1E3A50"}}>{t}</p>
+                          <p style={{margin:"2px 0 0",fontSize:12,color:P.gray}}>{s}</p>
+                        </div>
+                        <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${sel?P.pri:"#CBD5E1"}`,background:sel?P.pri:"white",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {sel&&<div style={{width:7,height:7,borderRadius:"50%",background:"white"}}/>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={startGame} style={{width:"100%",padding:14,fontSize:16,fontWeight:700,background:grad,color:"white",borderRadius:14,boxShadow:"0 6px 22px rgba(26,111,168,.34)"}}>
+                  Lancer la simulation
+                </button>
+                <button onClick={()=>setScreen("name")} style={{background:"none",padding:"10px",fontSize:13,color:P.gray,fontWeight:600,marginTop:8}}>← Retour</button>
               </div>
             )}
 
@@ -548,7 +600,7 @@
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:11}}>
                   <span style={{background:"white",padding:"6px 13px",borderRadius:50,fontSize:13,fontWeight:600,color:P.pri,boxShadow:"0 2px 8px rgba(26,111,168,.1)"}}>{player}</span>
                   <div style={{display:"flex",gap:4}}>
-                    {CASES.map((_,i)=><div key={i} style={{width:i===ci?26:18,height:6,borderRadius:3,background:i<ci?P.teal:i===ci?P.pri:"rgba(26,111,168,.18)",transition:"all .3s"}}/>)}
+                    {selectedCases.map((_,i)=><div key={i} style={{width:i===ci?26:18,height:6,borderRadius:3,background:i<ci?P.teal:i===ci?P.pri:"rgba(26,111,168,.18)",transition:"all .3s"}}/>)}
                   </div>
                   <span style={{background:grad,padding:"6px 13px",borderRadius:50,fontSize:13,fontWeight:700,color:"white"}}>{totalScore} pts</span>
                 </div>
@@ -836,7 +888,7 @@
                         <p style={{fontWeight:800,fontSize:15,color:P.green,margin:"0 0 5px"}}>😊 Objectif atteint !</p>
                         <p style={{fontSize:13,color:"#166534",lineHeight:1.65,margin:"0 0 10px"}}>{c.win}</p>
                         <button onClick={()=>setPhase("done")} style={{width:"100%",padding:12,fontSize:14,fontWeight:700,background:`linear-gradient(135deg,${P.teal},${P.green})`,color:"white",borderRadius:12}}>
-                          {ci+1<CASES.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                          {ci+1<selectedCases.length?"Situation suivante →":"Voir mes résultats 🎉"}
                         </button>
                       </div>
                     ) : methAttempts<2 ? (
@@ -854,7 +906,7 @@
                           <p style={{fontSize:12,color:"#1E3A50",lineHeight:1.65,margin:0}}>{c.win}</p>
                         </div>
                         <button onClick={()=>setPhase("done")} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
-                          {ci+1<CASES.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                          {ci+1<selectedCases.length?"Situation suivante →":"Voir mes résultats 🎉"}
                         </button>
                       </div>
                     )}
@@ -877,7 +929,7 @@
                       </div>
                     </div>
                     <button onClick={finishCase} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
-                      {ci+1<CASES.length?`Situation ${ci+2} : ${CASES[ci+1].tag} →`:"Voir mes résultats 🎉"}
+                      {ci+1<selectedCases.length?`Situation ${ci+2} : ${selectedCases[ci+1].tag} →`:"Voir mes résultats 🎉"}
                     </button>
                   </div>
                 )}
@@ -892,7 +944,7 @@
                   <p style={{fontWeight:600,fontSize:15,color:P.teal,margin:0}}>{badge.l}</p>
                 </div>
                 <div style={{background:"white",borderRadius:18,padding:"20px",marginBottom:12,boxShadow:"0 6px 22px rgba(26,111,168,.09)",textAlign:"center",borderTop:`4px solid ${P.pri}`}}>
-                  <div style={{fontWeight:800,fontSize:46,color:P.pri,lineHeight:1}}>{totalScore}<span style={{fontSize:16,color:"#CBD5E1",fontWeight:400}}> / {TOTAL_MAX}</span></div>
+                  <div style={{fontWeight:800,fontSize:46,color:P.pri,lineHeight:1}}>{totalScore}<span style={{fontSize:16,color:"#CBD5E1",fontWeight:400}}> / {selectedTotalMax}</span></div>
                   <p style={{fontSize:12,color:"#CBD5E1",margin:"3px 0 12px"}}>points</p>
                   <div style={{height:9,background:P.priXL,borderRadius:5,overflow:"hidden",marginBottom:5}}>
                     <div style={{height:"100%",width:`${pct}%`,background:grad,borderRadius:5,transition:"width 1.2s ease"}}/>
@@ -900,7 +952,7 @@
                   <p style={{fontSize:13,color:P.pri,fontWeight:700,margin:0}}>{pct}% de réussite</p>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
-                  {CASES.map((cas,i)=>{
+                  {selectedCases.map((cas,i)=>{
                     const s=caseScores[i]||{};
                     return (
                       <div key={i} style={{background:"white",borderRadius:13,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 2px 7px rgba(26,111,168,.06)",borderLeft:`3px solid ${(s.total||0)>=(CASE_MAX(cas)*0.7)?P.teal:P.pri}`}}>
@@ -931,7 +983,7 @@
               <div style={{maxWidth:460,width:"100%",paddingTop:20}}>
                 <div style={{textAlign:"center",marginBottom:14}}>
                   <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 3px"}}>🏆 Classement</h2>
-                  <p style={{fontSize:12,color:"#94A3B8",margin:0}}>Score maximum : {TOTAL_MAX} points</p>
+                  <p style={{fontSize:12,color:"#94A3B8",margin:0}}>Scores enregistrés sur cet appareil · % selon le nombre de situations jouées</p>
                 </div>
                 {lb.length===0 ? (
                   <div style={{background:"white",borderRadius:16,padding:28,textAlign:"center",color:"#CBD5E1",fontSize:14}}>Soyez le premier !</div>
@@ -941,7 +993,7 @@
                       <div key={i} style={{background:i===0?"#FFFDE7":"white",borderRadius:12,padding:"10px 15px",display:"flex",alignItems:"center",gap:10,border:i===0?"2px solid #FFD700":`1px solid ${P.priXL}`}}>
                         <span style={{fontSize:17,minWidth:22}}>{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
                         <span style={{flex:1,fontWeight:700,fontSize:14,color:"#1E3A50"}}>{e.name}</span>
-                        <span style={{fontSize:11,color:"#94A3B8"}}>{Math.round((e.score/TOTAL_MAX)*100)}%</span>
+                        <span style={{fontSize:11,color:"#94A3B8"}}>{Math.round((e.score/(e.max||TOTAL_MAX))*100)}%</span>
                         <span style={{fontWeight:800,fontSize:15,color:P.pri}}>{e.score} pts</span>
                       </div>
                     ))}
