@@ -17,6 +17,15 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
+    /* ──────────────────────────────────────────────────────────────
+       CLASSEMENT PARTAGÉ (optionnel)
+       Pour un classement commun à tous les téléphones du forum,
+       collez ci-dessous l'URL de votre service (voir instructions).
+       Laissez "" pour rester sur un classement local à chaque appareil.
+       Le jeu fonctionne dans tous les cas (repli automatique en local).
+    ────────────────────────────────────────────────────────────────── */
+    const REMOTE_URL = "https://script.google.com/macros/s/AKfycbxeXV32LVw0ZphbEAOyy5a7gYCStcH5SdIiCXcviCGOhG_njS9JgFmf4H_G2IKX-ilwqA/exec"; // classement partagé du forum
+
     /* ── Stockage local (localStorage) ── */
     const storage = {
       async list(prefix) {
@@ -92,6 +101,12 @@
           {l:"Respiration guidée 'souffler les bougies'",ok:false,c_ok:null,c_ko:"Le nourrisson ne réagit pas à la consigne verbale. À 4 mois, le contrôle volontaire de la respiration est neurologiquement impossible. La technique est sans effet."},
           {l:"Demander à la maman de sortir de la pièce",ok:false,c_ok:null,c_ko:"Les pleurs s'intensifient immédiatement. La séparation parentale active les circuits de détresse et amplifie la perception douloureuse."},
         ],
+        reassess:{
+          scale:"EVENDOL",
+          before:"6/15 (estimé sans préparation)",
+          after:"1/15 avec sucrose + succion",
+          expl:"On réévalue avec la MÊME échelle qu'avant le geste, et à distance de la stimulation, pour pouvoir comparer. La baisse confirme l'efficacité des moyens mis en place.",
+        },
         win:"La ponction s'est déroulée avec un score de douleur minimal. La maman, impliquée activement dans le soin, repart rassurée et avec confiance en l'équipe.",
       },
       {
@@ -140,6 +155,12 @@
           {l:"Succion non nutritive (tétine)",ok:false,c_ok:null,c_ko:"L'enfant repousse la tétine avec irritation. À 3 ans, la succion non nutritive n'a plus l'effet analgésique observé chez le nourrisson. Le rejet augmente sa frustration."},
           {l:"Respiration guidée 'souffler les bougies'",ok:false,c_ok:null,c_ko:"L'enfant essaie brièvement puis reprend ses pleurs. Le contrôle volontaire de la respiration sous stress n'est accessible que vers 4 ans. La technique n'est pas encore fiable."},
         ],
+        reassess:{
+          scale:"FLACC",
+          before:"7/10 au début du retrait",
+          after:"3/10 avec distraction + présence parentale",
+          expl:"La réévaluation se fait avec la même échelle (FLACC), une fois le geste terminé. Comparer le même outil avant/après est le seul moyen objectif de juger l'efficacité de la prise en charge.",
+        },
         win:"Le retrait s'est déroulé avec une détresse réduite. L'enfant a coopéré quelques instants. Le parent repart avec des stratégies à réutiliser à domicile.",
       },
       {
@@ -188,6 +209,12 @@
           {l:"Demander au parent de sortir de la pièce",ok:false,c_ok:null,c_ko:"L'enfant hurle et se débat, inconsolable. Séparer un enfant anxieux de son parent avant un soin amplifie massivement sa détresse et compromet le déroulement du soin."},
           {l:"Emmaillotage / contenance physique forcée",ok:false,c_ok:null,c_ko:"L'enfant se débat encore plus fort. À 4 ans, la contenance physique forcée est vécue comme intrusive. Elle amplifie l'anxiété et peut traumatiser l'enfant."},
         ],
+        reassess:{
+          scale:"FPS-R (vécu de l'enfant)",
+          before:"détresse anticipatoire marquée",
+          after:"FPS-R 1/10 — enfant apaisé après le geste",
+          expl:"Ici la problématique était l'anxiété : on réévalue donc le vécu et le niveau de détresse après le soin. Vérifier que l'enfant repart apaisé est essentiel, car une mauvaise expérience conditionne les soins futurs.",
+        },
         win:"L'enfant a traversé le soin avec une anxiété modérée. En partant, il dit : 'C'était pas aussi terrible.' Le parent vous remercie.",
       },
       {
@@ -236,6 +263,12 @@
           {l:"Repartir sans intervenir ('il ne dit rien')",ok:false,c_ok:null,c_ko:"20 minutes plus tard, le parent appelle en urgence : l'enfant pleure. L'absence d'expression verbale n'est pas synonyme d'absence de douleur. La douleur intériorisée est un piège clinique classique à 5 ans."},
           {l:"Augmenter l'éclairage et allumer la TV pour 'stimuler'",ok:false,c_ok:null,c_ko:"L'enfant se recroqueville et se couvre les yeux. L'hyperstimulation sensorielle augmente le stress et la perception douloureuse. L'environnement doit être apaisé, pas stimulé."},
         ],
+        reassess:{
+          scale:"FPS-R",
+          before:"4/10 à l'évaluation initiale",
+          after:"2/10 après prise en charge",
+          expl:"L'enfant ayant pu s'auto-évaluer (FPS-R 4/10), on réévalue avec la même échelle à distance. Le passage de 4 à 2/10 valide la stratégie ; sans réévaluation, on ne saurait pas si elle a fonctionné.",
+        },
         win:"Après évaluation (FPS-R 4/10), la prise en charge est mise en place. À la réévaluation : 2/10. L'enfant accepte un câlin de son parent.",
       },
       {
@@ -284,11 +317,17 @@
           {l:"Imagerie guidée 'va dans ton endroit préféré'",ok:false,c_ok:null,c_ko:"L'enfant vous regarde sans comprendre. À 2 ans, l'imaginaire dirigé n'est pas encore accessible. La technique est sans effet observable."},
           {l:"Jeu thérapeutique (poupée de soin)",ok:false,c_ok:null,c_ko:"L'enfant regarde sans intérêt. À 2 ans, la symbolisation par le jeu de rôle préparatoire n'est pas suffisamment développée."},
         ],
+        reassess:{
+          scale:"FLACC",
+          before:"8/10 sans préparation",
+          after:"3/10 avec contenance + distraction",
+          expl:"On réévalue avec la même échelle (FLACC) après l'injection. Le score divisé par plus de deux objective l'effet des moyens non médicamenteux et trace la qualité de la prise en charge.",
+        },
         win:"Score FLACC pendant l'injection : 3/10 au lieu de 8/10 sans préparation. L'enfant pleure mais est rapidement consolé dans les bras de son parent.",
       },
     ];
 
-    const CASE_MAX = c => 2 + 2 + c.methods.filter(m=>m.ok).length;
+    const CASE_MAX = c => 2 + 2 + 2 + c.methods.filter(m=>m.ok).length;
     const TOTAL_MAX = CASES.reduce((s,c)=>s+CASE_MAX(c),0);
 
     function childState(methods, sel) {
@@ -327,6 +366,13 @@
       const [methApplied, setMethApplied] = useState(false);
       const [methAttempts, setMethAttempts] = useState(0);
       const [methScore, setMethScore] = useState(0);
+      const [methPerfect, setMethPerfect] = useState(false);
+      const [reassSel, setReassSel] = useState(null);
+      const [reassAttempts, setReassAttempts] = useState(0);
+      const [reassCons, setReassCons] = useState(null);
+      const [reassScore, setReassScore] = useState(0);
+      const [reassConfirmed, setReassConfirmed] = useState(false);
+      const [resultView, setResultView] = useState("scores");
       const [caseScores, setCaseScores] = useState([]);
       const [totalScore, setTotalScore] = useState(0);
       const [lb, setLb] = useState([]);
@@ -334,23 +380,53 @@
 
       useEffect(()=>{loadLb();},[]);
 
+      async function loadLocalLb() {
+        const r = await window.storage.list("dnmsescape_");
+        if (r?.keys?.length) {
+          const items = await Promise.all(r.keys.map(async k=>{
+            try{const x=await window.storage.get(k);return x?JSON.parse(x.value):null;}catch{return null;}
+          }));
+          return items.filter(Boolean);
+        }
+        return [];
+      }
       async function loadLb() {
+        // 1) Classement partagé si une URL est configurée
+        if (REMOTE_URL) {
+          try {
+            const res = await fetch(REMOTE_URL, {method:"GET"});
+            const data = await res.json();
+            const arr = Array.isArray(data) ? data : (data.scores || []);
+            if (Array.isArray(arr)) {
+              setLb(arr.filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,12));
+              return;
+            }
+          } catch {}
+        }
+        // 2) Repli : classement local à l'appareil
         try {
-          const r = await window.storage.list("dnmsescape_");
-          if (r?.keys?.length) {
-            const items = await Promise.all(r.keys.map(async k=>{
-              try{const x=await window.storage.get(k);return x?JSON.parse(x.value):null;}catch{return null;}
-            }));
-            setLb(items.filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,12));
-          }
+          const items = await loadLocalLb();
+          setLb(items.sort((a,b)=>b.score-a.score).slice(0,12));
         } catch {}
       }
       async function saveLb(name,score) {
+        const entry = {name,score,max:selectedTotalMax,count:selectedCases.length,ts:Date.now()};
+        // On garde toujours une copie locale (sécurité / hors-ligne)
         try {
           const k=`dnmsescape_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-          await window.storage.set(k,JSON.stringify({name,score,max:selectedTotalMax,count:selectedCases.length,ts:Date.now()}));
-          loadLb();
+          await window.storage.set(k,JSON.stringify(entry));
         } catch {}
+        // Envoi au classement partagé si configuré
+        if (REMOTE_URL) {
+          try {
+            await fetch(REMOTE_URL, {
+              method:"POST",
+              headers:{"Content-Type":"text/plain;charset=utf-8"},
+              body:JSON.stringify(entry),
+            });
+          } catch {}
+        }
+        loadLb();
       }
 
       const c = selectedCases[ci] || CASES[0];
@@ -380,7 +456,8 @@
         setFlipped(new Set()); setFlipping(new Set());
         setAnaSel(null); setAnaAttempts(0); setAnaCons(null); setAnaScore(0);
         setScaSel([]); setScaAttempts(0); setScaCons(null); setScaScore(0);
-        setMethSel([]); setMethApplied(false); setMethAttempts(0); setMethScore(0);
+        setMethSel([]); setMethApplied(false); setMethAttempts(0); setMethScore(0); setMethPerfect(false);
+        setReassSel(null); setReassAttempts(0); setReassCons(null); setReassScore(0); setReassConfirmed(false);
         setAk(k=>k+1);
       }
 
@@ -445,23 +522,54 @@
         setMethApplied(true);
         const okSel = c.methods.filter((m,i)=>m.ok&&methSel.includes(i)).length;
         if (state>=100) {
-          setMethScore(okSel);
-          setTimeout(()=>setPhase("done"),300);
+          setMethScore(okSel); setMethPerfect(true);
+          setTimeout(()=>setPhase("reassess"),300);
         } else if (attempts>=2) {
           setMethScore(okSel);
         }
       }
       function reviseMethods() { setMethApplied(false); }
 
+      const REASS_OPTS = [
+        {l:"Réévaluer la douleur avec la même échelle, à distance du geste", ok:true,
+         cons:null},
+        {l:"Considérer le soin réussi : la douleur est forcément soulagée", ok:false,
+         cons:"Sans réévaluation, rien ne prouve que la prise en charge a fonctionné. La douleur peut persister ou réapparaître. La réévaluation systématique fait partie intégrante de la démarche de soin : évaluer → traiter → réévaluer."},
+        {l:"Réévaluer mais en changeant d'échelle pour varier", ok:false,
+         cons:"Changer d'outil rend la comparaison impossible. Pour juger l'efficacité, on réévalue avec LA MÊME échelle que celle utilisée initialement : c'est la seule façon de comparer un avant et un après fiables."},
+      ];
+      function submitReass() {
+        if (reassSel===null) return;
+        const isOk = REASS_OPTS[reassSel].ok;
+        const attempts = reassAttempts+1;
+        setReassAttempts(attempts);
+        if (isOk) {
+          const pts = attempts===1?2:attempts===2?1:0;
+          setReassScore(pts); setReassCons(null); setReassConfirmed(true);
+        } else {
+          setReassCons({text:REASS_OPTS[reassSel].cons, showAnswer:attempts>=2});
+        }
+      }
+      function retryReass() { setReassSel(null); setReassCons(null); }
+      function forceNextFromReass() { setReassScore(0); setReassCons(null); setReassConfirmed(true); }
+
       function finishCase() {
-        const total = anaScore+scaScore+methScore;
-        const newScores = [...caseScores, {ana:anaScore,sca:scaScore,meth:methScore,max:CASE_MAX(c),total}];
+        const total = anaScore+scaScore+reassScore+methScore;
+        const okCount = c.methods.filter(m=>m.ok).length;
+        const entry = {
+          ana:anaScore, sca:scaScore, reass:reassScore, meth:methScore,
+          methOk:okCount, methPerfect, max:CASE_MAX(c), total,
+          flags:{ ana:anaScore<2, sca:scaScore<2, reass:reassScore<2, meth:!methPerfect }
+        };
+        const newScores = [...caseScores, entry];
         setCaseScores(newScores);
         const newTotal = totalScore+total;
         setTotalScore(newTotal);
         if (ci+1<selectedCases.length) { resetCase(ci+1); }
-        else { saveLb(player,newTotal); setScreen("result"); }
+        else { saveLb(player,newTotal); setResultView("scores"); setScreen("result"); }
       }
+
+      const keyActivate = (fn)=>(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fn(); } };
 
       const cState = useMemo(()=>childState(c.methods,methSel),[methSel,ci]);
       const cStateInfo = stateLabel(cState);
@@ -486,6 +594,7 @@
             .clue:not(.revealed):hover{transform:translateY(-3px) scale(1.02);box-shadow:0 8px 24px rgba(26,111,168,.3)!important}
             .clue{transition:transform .14s,box-shadow .14s;cursor:pointer;}
             .clue.revealed{cursor:default;}
+            [role="button"]:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #2E9BD6;outline-offset:2px;border-radius:8px;}
             .optcard:not([data-done]):hover{transform:translateY(-2px);border-color:#1A6FA8!important;box-shadow:0 5px 16px rgba(26,111,168,.15)!important}
             .optcard{transition:transform .14s,border-color .14s,box-shadow .14s;cursor:pointer}
             .optcard[data-done]{cursor:default}
@@ -575,6 +684,8 @@
                     const sel=caseCount===v;
                     return (
                       <div key={String(v)} className="optcard" onClick={()=>setCaseCount(v)}
+                        role="button" tabIndex={0} aria-pressed={sel} aria-label={t}
+                        onKeyDown={keyActivate(()=>setCaseCount(v))}
                         style={{background:sel?P.priXL:"white",border:`2px solid ${sel?P.pri:"#E2EBF0"}`,borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:13,textAlign:"left",boxShadow:"0 2px 8px rgba(26,111,168,.06)"}}>
                         <span style={{fontSize:26,flexShrink:0}}>{icon}</span>
                         <div style={{flex:1}}>
@@ -618,8 +729,8 @@
                 </div>
 
                 <div style={{display:"flex",gap:5,marginBottom:12}}>
-                  {[["🔍","Indices"],["🩺","Analyse"],["📊","Échelle"],["🎯","Interventions"]].map(([icon,lab],i)=>{
-                    const phaseOrder=["investigate","analyze","scale","intervene","done"];
+                  {[["🔍","Indices"],["🩺","Analyse"],["📊","Échelle"],["🎯","Soins"],["🔁","Bilan"]].map(([icon,lab],i)=>{
+                    const phaseOrder=["investigate","analyze","scale","intervene","reassess","done"];
                     const currIdx=phaseOrder.indexOf(phase);
                     const active=currIdx===i, done=currIdx>i;
                     return (
@@ -658,6 +769,11 @@
                         return (
                           <div key={cl.id} className={`clue${isFlipped?" revealed":""}${isFlipping?" flipping":""}`}
                             onClick={()=>flipCard(cl.id)}
+                            role="button"
+                            tabIndex={isFlipped?-1:0}
+                            aria-pressed={isFlipped}
+                            aria-label={isFlipped ? `${cl.lab} : ${cl.find}` : `${cl.lab}. Appuyer pour révéler l'indice`}
+                            onKeyDown={keyActivate(()=>flipCard(cl.id))}
                             style={{background:isFlipped?"white":grad,border:`1px solid ${isFlipped?P.priXL:"transparent"}`,borderRadius:12,padding:"11px 10px",minHeight:96,display:"flex",flexDirection:"column",justifyContent:isFlipped?"flex-start":"center",alignItems:isFlipped?"flex-start":"center",textAlign:isFlipped?"left":"center",boxShadow:isFlipped?"0 2px 8px rgba(26,111,168,.07)":"0 4px 14px rgba(26,111,168,.22)"}}>
                             {!isFlipped?(
                               <>
@@ -743,6 +859,9 @@
                           return (
                             <div key={i} className="optcard" data-done={anaCons||undefined}
                               onClick={()=>!anaCons&&setAnaSel(i)}
+                              role="button" tabIndex={anaCons?-1:0} aria-pressed={anaSel===i}
+                              aria-label={`${opt.l}. ${opt.s}`}
+                              onKeyDown={keyActivate(()=>!anaCons&&setAnaSel(i))}
                               style={{background:bg,border:brd,borderRadius:12,padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
                               <div>
                                 <p style={{margin:0,fontWeight:700,fontSize:13,color:col}}>{opt.l}</p>
@@ -805,6 +924,9 @@
                             if(checked){bg=P.priXL;brd=`2px solid ${P.pri}`;}
                             return (
                               <div key={i} className="optcard" onClick={()=>toggleSca(i)}
+                                role="checkbox" tabIndex={0} aria-checked={checked}
+                                aria-label={`${opt.l}. ${opt.s}`}
+                                onKeyDown={keyActivate(()=>toggleSca(i))}
                                 style={{background:bg,border:brd,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
                                 <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${boxBrd}`,background:boxBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                                   {checked&&<span style={{color:"white",fontSize:10,fontWeight:700}}>✓</span>}
@@ -863,6 +985,9 @@
                           <div key={i}>
                             <div className="mrow" data-done={methApplied||undefined}
                               onClick={()=>toggleMeth(i)}
+                              role="checkbox" tabIndex={methApplied?-1:0} aria-checked={checked}
+                              aria-label={m.l}
+                              onKeyDown={keyActivate(()=>toggleMeth(i))}
                               style={{background:bg,border:brd,borderRadius:revealed&&expl?"12px 12px 0 0":12,padding:"10px 13px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
                               <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${boxBrd}`,background:boxBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                                 {checked&&<span style={{color:"white",fontSize:10,fontWeight:700}}>✓</span>}
@@ -885,10 +1010,10 @@
                       </button>
                     ) : cState>=100 ? (
                       <div className="fadein" style={{background:P.greenL,border:`2px solid ${P.green}`,borderRadius:14,padding:"14px",marginTop:4,textAlign:"center"}}>
-                        <p style={{fontWeight:800,fontSize:15,color:P.green,margin:"0 0 5px"}}>😊 Objectif atteint !</p>
-                        <p style={{fontSize:13,color:"#166534",lineHeight:1.65,margin:"0 0 10px"}}>{c.win}</p>
-                        <button onClick={()=>setPhase("done")} style={{width:"100%",padding:12,fontSize:14,fontWeight:700,background:`linear-gradient(135deg,${P.teal},${P.green})`,color:"white",borderRadius:12}}>
-                          {ci+1<selectedCases.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                        <p style={{fontWeight:800,fontSize:15,color:P.green,margin:"0 0 5px"}}>😊 Interventions efficaces</p>
+                        <p style={{fontSize:13,color:"#166534",lineHeight:1.65,margin:"0 0 10px"}}>L'enfant est apaisé. Mais le soin n'est pas terminé : il reste une étape essentielle.</p>
+                        <button onClick={()=>setPhase("reassess")} style={{width:"100%",padding:12,fontSize:14,fontWeight:700,background:`linear-gradient(135deg,${P.teal},${P.green})`,color:"white",borderRadius:12}}>
+                          Passer à la réévaluation →
                         </button>
                       </div>
                     ) : methAttempts<2 ? (
@@ -905,8 +1030,88 @@
                           <p style={{fontWeight:700,fontSize:13,color:P.pri,margin:"0 0 6px"}}>📚 Interventions recommandées</p>
                           <p style={{fontSize:12,color:"#1E3A50",lineHeight:1.65,margin:0}}>{c.win}</p>
                         </div>
+                        <button onClick={()=>setPhase("reassess")} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
+                          Passer à la réévaluation →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {phase==="reassess" && (
+                  <div key={`reass-${ci}-${ak}`} className="fadein">
+                    <div style={{background:P.tealL,borderRadius:12,padding:"9px 13px",marginBottom:11,display:"flex",gap:8,alignItems:"center",borderLeft:`3px solid ${P.teal}`}}>
+                      <span style={{fontSize:14}}>🔁</span>
+                      <p style={{margin:0,fontSize:12,color:P.teal,fontWeight:600}}>Démarche de soin : évaluer → traiter → <strong>réévaluer</strong></p>
+                    </div>
+                    <p style={{fontWeight:800,fontSize:14,color:"#1E3A50",margin:"0 0 11px",lineHeight:1.5}}>Les interventions sont en place. Quelle est la conduite à tenir maintenant ?</p>
+                    {reassCons && (
+                      <div className="sdown" style={{background:P.amberL,border:`2px solid ${P.amber}`,borderRadius:13,padding:"12px 14px",marginBottom:11}}>
+                        <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:8}}>
+                          <span style={{fontSize:18,flexShrink:0}}>🔄</span>
+                          <p style={{margin:0,fontSize:13,fontWeight:700,color:P.amber}}>À reconsidérer...</p>
+                        </div>
+                        <p style={{fontSize:12.5,color:"#78350F",lineHeight:1.68,margin:"0 0 10px"}}>{reassCons.text}</p>
+                        {!reassCons.showAnswer ? (
+                          <button onClick={retryReass} style={{width:"100%",padding:"9px",fontSize:12,fontWeight:700,background:"white",color:P.amber,borderRadius:10,border:`1.5px solid ${P.amber}`}}>
+                            Reconsidérer
+                          </button>
+                        ) : (
+                          <div style={{background:"white",borderRadius:10,padding:"10px 12px",marginTop:4}}>
+                            <p style={{fontWeight:700,fontSize:12,color:P.teal,margin:"0 0 4px"}}>✅ Conduite attendue :</p>
+                            <p style={{fontSize:12,color:"#1E3A50",fontWeight:600,margin:"0 0 4px"}}>Réévaluer avec la même échelle, à distance du geste</p>
+                            <p style={{fontSize:12,color:"#475569",lineHeight:1.65,margin:"0 0 8px"}}>{c.reassess.expl}</p>
+                            <button onClick={forceNextFromReass} style={{width:"100%",padding:"9px",fontSize:12,fontWeight:700,background:grad,color:"white",borderRadius:9}}>
+                              Continuer →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!reassConfirmed && !reassCons?.showAnswer && (
+                      <>
+                        <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:11}}>
+                          {REASS_OPTS.map((opt,i)=>{
+                            let bg="white",brd="2px solid #E2EBF0",col="#334155";
+                            if(reassSel===i){bg=P.priXL;brd=`2px solid ${P.pri}`;col=P.pri;}
+                            return (
+                              <div key={i} className="optcard" data-done={reassCons||undefined}
+                                onClick={()=>!reassCons&&setReassSel(i)}
+                                role="button" tabIndex={reassCons?-1:0} aria-pressed={reassSel===i} aria-label={opt.l}
+                                onKeyDown={keyActivate(()=>!reassCons&&setReassSel(i))}
+                                style={{background:bg,border:brd,borderRadius:12,padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
+                                <p style={{margin:0,fontWeight:600,fontSize:13,color:col,lineHeight:1.45,flex:1}}>{opt.l}</p>
+                                <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${reassSel===i?P.pri:"#CBD5E1"}`,background:reassSel===i?P.pri:"white",flexShrink:0,marginLeft:10,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {reassSel===i&&<div style={{width:6,height:6,borderRadius:"50%",background:"white"}}/>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button onClick={submitReass} disabled={reassSel===null} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:reassSel!==null?grad:"#E5E7EB",color:reassSel!==null?"white":"#9CA3AF",borderRadius:13,transition:"all .2s"}}>
+                          Valider la conduite
+                        </button>
+                      </>
+                    )}
+                    {reassConfirmed && (
+                      <div className="fadein">
+                        <div style={{background:"white",borderRadius:14,padding:"14px 16px",marginBottom:11,boxShadow:"0 3px 10px rgba(26,111,168,.08)",border:`2px solid ${P.tealL}`}}>
+                          <p style={{fontWeight:700,fontSize:12,color:P.teal,margin:"0 0 10px",textTransform:"uppercase",letterSpacing:.5}}>📉 Réévaluation — {c.reassess.scale}</p>
+                          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                            <div style={{flex:1,background:P.redL,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                              <p style={{margin:0,fontSize:10,color:P.red,fontWeight:600}}>AVANT prise en charge</p>
+                              <p style={{margin:"3px 0 0",fontSize:14,fontWeight:800,color:P.red}}>{c.reassess.before}</p>
+                            </div>
+                            <span style={{fontSize:20,color:P.teal}}>→</span>
+                            <div style={{flex:1,background:P.greenL,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                              <p style={{margin:0,fontSize:10,color:P.green,fontWeight:600}}>APRÈS prise en charge</p>
+                              <p style={{margin:"3px 0 0",fontSize:14,fontWeight:800,color:P.green}}>{c.reassess.after}</p>
+                            </div>
+                          </div>
+                          <p style={{fontSize:12,color:"#475569",lineHeight:1.65,margin:"8px 0 0"}}>{c.reassess.expl}</p>
+                        </div>
                         <button onClick={()=>setPhase("done")} style={{width:"100%",padding:13,fontSize:14,fontWeight:700,background:grad,color:"white",borderRadius:13}}>
-                          {ci+1<selectedCases.length?"Situation suivante →":"Voir mes résultats 🎉"}
+                          Terminer la situation →
                         </button>
                       </div>
                     )}
@@ -919,9 +1124,9 @@
                       <div style={{fontSize:48,marginBottom:8}}>✅</div>
                       <h3 style={{fontWeight:800,fontSize:18,color:P.teal,margin:"0 0 6px"}}>{c.tag} — terminé</h3>
                       <p style={{fontSize:13,color:"#475569",lineHeight:1.7,margin:"0 0 14px"}}>{c.win}</p>
-                      <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-                        {[{l:"Analyse",v:anaScore,m:2},{l:"Échelle",v:scaScore,m:2},{l:"Méthodes",v:methScore,m:c.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
-                          <div key={l} style={{flex:1,background:P.priXL,borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+                      <div style={{display:"flex",gap:6,justifyContent:"center",flexWrap:"wrap"}}>
+                        {[{l:"Analyse",v:anaScore,m:2},{l:"Échelle",v:scaScore,m:2},{l:"Réévaluation",v:reassScore,m:2},{l:"Méthodes",v:methScore,m:c.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
+                          <div key={l} style={{flex:"1 1 40%",minWidth:70,background:P.priXL,borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
                             <p style={{fontWeight:800,fontSize:20,color:P.pri,margin:"0 0 2px"}}>{v}<span style={{fontSize:12,color:"#94A3B8",fontWeight:400}}>/{m}</span></p>
                             <p style={{fontSize:11,color:P.gray,margin:0}}>{l}</p>
                           </div>
@@ -951,7 +1156,17 @@
                   </div>
                   <p style={{fontSize:13,color:P.pri,fontWeight:700,margin:0}}>{pct}% de réussite</p>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                <div style={{display:"flex",gap:5,marginBottom:12}}>
+                  {[["scores","📊 Scores"],["debrief","🔍 À revoir"],["memo","📋 Fiche mémo"]].map(([v,lab])=>{
+                    const act=resultView===v;
+                    return (
+                      <button key={v} onClick={()=>setResultView(v)} style={{flex:1,padding:"9px 4px",fontSize:12,fontWeight:700,borderRadius:10,background:act?grad:"white",color:act?"white":P.gray,boxShadow:act?"0 3px 10px rgba(26,111,168,.22)":"0 1px 4px rgba(0,0,0,.05)"}}>{lab}</button>
+                    );
+                  })}
+                </div>
+
+                {resultView==="scores" && (
+                <div className="fadein" style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
                   {selectedCases.map((cas,i)=>{
                     const s=caseScores[i]||{};
                     return (
@@ -960,9 +1175,9 @@
                         <div style={{flex:1}}>
                           <p style={{margin:0,fontWeight:700,fontSize:13,color:"#1E3A50"}}>{cas.tag}</p>
                           <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:3}}>
-                            {[{l:"Analyse",v:s.ana,m:2},{l:"Échelle",v:s.sca,m:2},{l:"Méthodes",v:s.meth,m:cas.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
+                            {[{l:"Analyse",v:s.ana,m:2},{l:"Échelle",v:s.sca,m:2},{l:"Réév.",v:s.reass,m:2},{l:"Méthodes",v:s.meth,m:cas.methods.filter(m=>m.ok).length}].map(({l,v,m})=>(
                               <span key={l} style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:50,background:v===m?P.greenL:v>0?P.amberL:P.redL,color:v===m?P.green:v>0?P.amber:P.red}}>
-                                {l} {v}/{m}
+                                {l} {v||0}/{m}
                               </span>
                             ))}
                           </div>
@@ -972,6 +1187,92 @@
                     );
                   })}
                 </div>
+                )}
+
+                {resultView==="debrief" && (
+                <div className="fadein" style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+                  {selectedCases.map((cas,i)=>{
+                    const s=caseScores[i]||{}; const f=s.flags||{};
+                    const nothing = !f.ana && !f.sca && !f.reass && !f.meth;
+                    return (
+                      <div key={i} style={{background:"white",borderRadius:13,padding:"12px 14px",boxShadow:"0 2px 7px rgba(26,111,168,.06)",borderLeft:`3px solid ${nothing?P.green:P.amber}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:nothing?0:8}}>
+                          <span style={{fontSize:18}}>{cas.emoji}</span>
+                          <p style={{margin:0,fontWeight:700,fontSize:13,color:"#1E3A50"}}>{cas.tag}</p>
+                        </div>
+                        {nothing ? (
+                          <p style={{margin:0,fontSize:12,color:P.green,fontWeight:600}}>✅ Situation maîtrisée — rien à revoir.</p>
+                        ) : (
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {f.ana && (
+                              <div style={{background:P.priXL,borderRadius:9,padding:"8px 10px"}}>
+                                <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:700,color:P.pri}}>🩺 Analyse → {cas.analysis.opts.find(o=>o.ok)?.l}</p>
+                                <p style={{margin:0,fontSize:11.5,color:"#475569",lineHeight:1.55}}>{cas.analysis.expl}</p>
+                              </div>
+                            )}
+                            {f.sca && (
+                              <div style={{background:P.priXL,borderRadius:9,padding:"8px 10px"}}>
+                                <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:700,color:P.pri}}>📊 Échelle(s) → {cas.scales.opts.filter(o=>o.ok).map(o=>o.l).join(" · ")}</p>
+                                <p style={{margin:0,fontSize:11.5,color:"#475569",lineHeight:1.55}}>{cas.scales.expl}</p>
+                              </div>
+                            )}
+                            {f.reass && (
+                              <div style={{background:P.priXL,borderRadius:9,padding:"8px 10px"}}>
+                                <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:700,color:P.pri}}>🔁 Réévaluation → même échelle, à distance du geste</p>
+                                <p style={{margin:0,fontSize:11.5,color:"#475569",lineHeight:1.55}}>{cas.reassess.expl}</p>
+                              </div>
+                            )}
+                            {f.meth && (
+                              <div style={{background:P.priXL,borderRadius:9,padding:"8px 10px"}}>
+                                <p style={{margin:"0 0 2px",fontSize:11.5,fontWeight:700,color:P.pri}}>🎯 Interventions adaptées</p>
+                                <p style={{margin:0,fontSize:11.5,color:"#475569",lineHeight:1.55}}>{cas.methods.filter(m=>m.ok).map(m=>m.l).join(" · ")}.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                )}
+
+                {resultView==="memo" && (
+                <div className="fadein" style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+                  <div style={{background:"white",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 7px rgba(26,111,168,.06)"}}>
+                    <p style={{fontWeight:800,fontSize:13,color:P.pri,margin:"0 0 9px"}}>👶 Quel âge → quelle échelle ?</p>
+                    {[
+                      ["0–3 mois","DAN (douleur procédurale) · hétéroévaluation"],
+                      ["Naissance–7 ans","EVENDOL · hétéroévaluation"],
+                      ["Nourrisson–7 ans","FLACC · hétéroévaluation comportementale"],
+                      ["Dès ~4 ans","FPS-R (échelle des visages) · auto-évaluation si compréhension"],
+                      ["Dès ~8 ans","EVA / EN · auto-évaluation (échelle abstraite)"],
+                    ].map(([age,ech],k)=>(
+                      <div key={k} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:k<4?`1px solid ${P.priXL}`:"none"}}>
+                        <span style={{flexShrink:0,minWidth:96,fontSize:11.5,fontWeight:700,color:P.teal}}>{age}</span>
+                        <span style={{fontSize:11.5,color:"#475569",lineHeight:1.5}}>{ech}</span>
+                      </div>
+                    ))}
+                    <p style={{fontSize:11,color:P.gray,margin:"9px 0 0",fontStyle:"italic"}}>Repère : l'auto-évaluation est privilégiée dès qu'elle est fiable ; en dessous, ou si l'enfant ne coopère pas, on recourt à l'hétéroévaluation.</p>
+                  </div>
+                  <div style={{background:"white",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 7px rgba(26,111,168,.06)"}}>
+                    <p style={{fontWeight:800,fontSize:13,color:P.pri,margin:"0 0 8px"}}>🌡️ Signes neurovégétatifs de douleur</p>
+                    <p style={{fontSize:11.5,color:"#475569",lineHeight:1.6,margin:0}}>Tachycardie, polypnée / respiration rapide et superficielle, hypertonie (membres tendus, poings serrés), sueurs, pâleur, agitation. Ce sont des signes d'activation du système sympathique : ils peuvent signaler une douleur aiguë <strong>même en l'absence de pleurs</strong>.</p>
+                  </div>
+                  <div style={{background:P.tealL,borderRadius:14,padding:"14px 16px",borderLeft:`3px solid ${P.teal}`}}>
+                    <p style={{fontWeight:800,fontSize:13,color:P.teal,margin:"0 0 8px"}}>🔑 Points clés à retenir</p>
+                    {[
+                      "Démarche : évaluer → traiter → réévaluer (toujours avec la même échelle).",
+                      "L'absence d'expression verbale ne signifie pas absence de douleur.",
+                      "Pleurs non obligatoires : les signes neurovégétatifs suffisent à alerter.",
+                      "La présence parentale est une ressource thérapeutique, pas une gêne.",
+                      "Les moyens non médicamenteux complètent l'antalgie, ils ne la remplacent pas.",
+                    ].map((t,k)=>(
+                      <p key={k} style={{fontSize:11.5,color:"#0F5A50",lineHeight:1.5,margin:"0 0 5px",display:"flex",gap:6}}><span>•</span><span>{t}</span></p>
+                    ))}
+                    <p style={{fontSize:10.5,color:P.gray,margin:"6px 0 0",fontStyle:"italic"}}>Repères pédagogiques à vérifier auprès des recommandations de référence (ex. Pédiadol, HAS) avant diffusion.</p>
+                  </div>
+                </div>
+                )}
                 <div style={{display:"flex",gap:9}}>
                   <button onClick={()=>setScreen("leaderboard")} style={{flex:1,background:"white",color:P.pri,fontSize:13,fontWeight:700,padding:13,borderRadius:13,border:`2px solid ${P.priXL}`}}>🏆 Classement</button>
                   <button onClick={()=>{setNameInput("");setScreen("home");}} style={{flex:1,background:grad,color:"white",fontSize:13,fontWeight:700,padding:13,borderRadius:13}}>🔄 Rejouer</button>
@@ -983,7 +1284,7 @@
               <div style={{maxWidth:460,width:"100%",paddingTop:20}}>
                 <div style={{textAlign:"center",marginBottom:14}}>
                   <h2 style={{fontWeight:800,fontSize:22,color:P.pri,margin:"0 0 3px"}}>🏆 Classement</h2>
-                  <p style={{fontSize:12,color:"#94A3B8",margin:0}}>Scores enregistrés sur cet appareil · % selon le nombre de situations jouées</p>
+                  <p style={{fontSize:12,color:"#94A3B8",margin:0}}>{REMOTE_URL?"Classement partagé du forum":"Scores enregistrés sur cet appareil"} · % selon le nombre de situations jouées</p>
                 </div>
                 {lb.length===0 ? (
                   <div style={{background:"white",borderRadius:16,padding:28,textAlign:"center",color:"#CBD5E1",fontSize:14}}>Soyez le premier !</div>
